@@ -7,6 +7,7 @@ const SPINE_COLOR = "#c41e3a";
 const MANE_SEGMENTS = 10;
 const MANE_LENGTH_RATIO = 15;
 const THICK_PORTION = 0.6;
+const MANE_ROOT_JITTER = 6;
 
 const GREETING_TEXT = "새해 복 많이 받으세요 2026  ";
 const TEXT_COLOR = "rgba(255, 235, 215, 0.9)";
@@ -112,7 +113,7 @@ function initManes() {
   manes = [];
 
   const layout = getLayoutValues();
-  const spacing = 8;
+  const spacing = 5;
 
   arcCenterX = layout.cx;
   arcCenterY = layout.cy;
@@ -153,7 +154,12 @@ function initManes() {
       dirY = 0;
     }
 
-    manes.push(new ManeStrand(x, y, dirX, dirY, i, maneCount));
+    const jitterX = (Math.random() - 0.5) * MANE_ROOT_JITTER;
+    const jitterY = (Math.random() - 0.5) * MANE_ROOT_JITTER;
+
+    manes.push(
+      new ManeStrand(x + jitterX, y + jitterY, dirX, dirY, i, maneCount),
+    );
   }
 }
 
@@ -244,9 +250,9 @@ class ManeStrand {
 
       if (this.touched) {
         this.velocities[i].x +=
-          (Math.random() - 0.5) * this.touchStrength * 1.5;
+          (Math.random() - 0.5) * this.touchStrength * 0.35;
         this.velocities[i].y +=
-          (Math.random() - 0.5) * this.touchStrength * 1.5;
+          (Math.random() - 0.5) * this.touchStrength * 0.35;
       }
 
       const isBoundPoint = boundRibbon && i === this.boundSegmentIndex;
@@ -272,8 +278,8 @@ class ManeStrand {
       this.points[i].x += this.velocities[i].x;
       this.points[i].y += this.velocities[i].y;
 
-      this.velocities[i].x *= 0.92;
-      this.velocities[i].y *= 0.92;
+      this.velocities[i].x *= 0.82;
+      this.velocities[i].y *= 0.82;
     }
 
     for (let pass = 0; pass < 3; pass++) {
@@ -357,7 +363,7 @@ class ManeStrand {
     }
 
     ctx.strokeStyle = this.color;
-    ctx.lineWidth = 6 - (this.index % 3);
+    ctx.lineWidth = 4 - (this.index % 2);
     ctx.lineCap = "round";
     ctx.shadowBlur = 10;
     ctx.shadowColor = this.color;
@@ -766,7 +772,7 @@ function animate() {
     mane.draw();
   });
 
-  drawSpine();
+  // drawSpine();
   drawRibbons();
 
   requestAnimationFrame(animate);
