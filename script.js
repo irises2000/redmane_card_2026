@@ -9,14 +9,16 @@ const MANE_LENGTH_RATIO = 15;
 const THICK_PORTION = 0.6;
 const MANE_ROOT_JITTER = 6;
 
-const GREETING_TEXT = "새해 복 많이 받으세요 2026  ";
+let GREETING_TEXT = "";
 const TEXT_COLOR = "rgba(255, 235, 215, 0.9)";
 const TEXT_FONT_FAMILY = '"Times New Roman", serif';
-const TEXT_WEIGHT = "500";
-const TEXT_SIZE_RATIO = 0.03;
+const TEXT_WEIGHT = "150";
+const TEXT_SIZE_RATIO = 0.01;
 const TEXT_START_OFFSET = 40;
-const TEXT_REPEAT_GAP = 24;
 
+// 여기만 네 구글 시트 CSV 주소로 바꿔줘
+const SHEET_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vRKi5g-6wPn9FoAMVi82Exy8t1sluR2jNqjXgtB4eCB1U6ncqyl69d60CWrd10e4F_2eW2v7Gl9Jubs/pub?gid=0&single=true&output=csv";
 // 리본 관련
 const RIBBON_CAPTURE_RADIUS = 34;
 const RIBBON_TOGGLE_RADIUS = 18;
@@ -31,7 +33,7 @@ const CLICK_TIME_THRESHOLD = 10;
 const TOUCH_TAP_TIME_THRESHOLD = 10;
 const TOUCH_TAP_MOVE_THRESHOLD = 12;
 
-const POINTER_INFLUENCE_RADIUS = 50;
+const POINTER_INFLUENCE_RADIUS = 70;
 const POINTER_FORCE_MULTIPLIER = 20;
 
 let manes = [];
@@ -61,6 +63,77 @@ function getRandomRibbonColor() {
   const saturation = 70 + Math.random() * 20;
   const lightness = 55 + Math.random() * 10;
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current.trim());
+  return result;
+}
+
+async function loadGreetingTextFromSheet() {
+  try {
+    const res = await fetch(SHEET_CSV_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const csv = await res.text();
+
+    const rows = csv
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map(parseCSVLine);
+
+    if (rows.length < 2) return;
+
+    const header = rows[0].map((v) =>
+      v.replace(/^"|"$/g, "").trim().toLowerCase(),
+    );
+    const nameIndex = header.indexOf("name");
+    const letterIndex = header.indexOf("letter");
+
+    if (nameIndex === -1 || letterIndex === -1) {
+      console.warn("CSV header must include 'name' and 'letter'");
+      return;
+    }
+
+    const dataRows = rows
+      .slice(1)
+      .map((row) => ({
+        name: (row[nameIndex] || "").replace(/^"|"$/g, "").trim(),
+        letter: (row[letterIndex] || "").replace(/^"|"$/g, "").trim(),
+      }))
+      .filter((row) => row.name && row.letter);
+
+    if (dataRows.length === 0) return;
+
+    const picked = dataRows[Math.floor(Math.random() * dataRows.length)];
+    GREETING_TEXT = `${picked.name}님, ${picked.letter}  `;
+  } catch (err) {
+    console.error("Failed to load greeting text from sheet:", err);
+  }
 }
 
 function resizeCanvas() {
@@ -448,35 +521,30 @@ function drawTextOnSpine() {
   const text = GREETING_TEXT;
   const { widths, total } = measureTextSequence(text);
 
-  const usableLength = layout.totalLen - TEXT_START_OFFSET;
-  if (usableLength <= 0 || total <= 0) return;
+  if (total <= 0) return;
 
   const textOffset = layout.thickManeLength * 0.5;
 
   let cursor = TEXT_START_OFFSET;
 
-  while (cursor < layout.totalLen - 10) {
-    for (let i = 0; i < text.length; i++) {
-      const charWidth = widths[i];
-      const charCenter = cursor + charWidth / 2;
+  for (let i = 0; i < text.length; i++) {
+    const charWidth = widths[i];
+    const charCenter = cursor + charWidth / 2;
 
-      if (charCenter >= layout.totalLen) break;
+    if (charCenter >= layout.totalLen) break;
 
-      const p = getPointOnSpine(charCenter);
+    const p = getPointOnSpine(charCenter);
 
-      const drawX = p.x + p.normalX * textOffset;
-      const drawY = p.y + p.normalY * textOffset;
+    const drawX = p.x + p.normalX * textOffset;
+    const drawY = p.y + p.normalY * textOffset;
 
-      ctx.save();
-      ctx.translate(drawX, drawY);
-      ctx.rotate(p.tangentAngle);
-      ctx.fillText(text[i], 0, 0);
-      ctx.restore();
+    ctx.save();
+    ctx.translate(drawX, drawY);
+    ctx.rotate(p.tangentAngle);
+    ctx.fillText(text[i], 0, 0);
+    ctx.restore();
 
-      cursor += charWidth;
-    }
-
-    cursor += TEXT_REPEAT_GAP;
+    cursor += charWidth;
   }
 }
 
@@ -788,10 +856,15 @@ function animate() {
   requestAnimationFrame(animate);
 }
 
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
+async function init() {
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
 
-ctx.fillStyle = BG_COLOR;
-ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-animate();
+  await loadGreetingTextFromSheet();
+  animate();
+}
+
+init();
