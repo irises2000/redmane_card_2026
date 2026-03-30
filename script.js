@@ -26,7 +26,7 @@ const RIBBON_SIZE = 12;
 
 // 클릭 / 드래그 판정
 const CLICK_MOVE_THRESHOLD = 6;
-const CLICK_TIME_THRESHOLD = 180;
+const CLICK_TIME_THRESHOLD = 320;
 
 let manes = [];
 let ribbons = [];
