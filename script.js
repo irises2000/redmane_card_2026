@@ -18,18 +18,21 @@ const TEXT_START_OFFSET = 40;
 const TEXT_REPEAT_GAP = 24;
 
 // 리본 관련
-const RIBBON_CAPTURE_RADIUS = 20;
-const RIBBON_TOGGLE_RADIUS = 20;
+const RIBBON_CAPTURE_RADIUS = 34;
+const RIBBON_TOGGLE_RADIUS = 18;
 const RIBBON_BIND_STRENGTH = 0.42;
 const RIBBON_DAMPING = 0.72;
 const RIBBON_SIZE = 12;
-const RIBBON_SNAP_STRENGTH = 0.92;
+const RIBBON_SNAP_STRENGTH = 0.97;
 
 // 클릭 / 드래그 판정
 const CLICK_MOVE_THRESHOLD = 6;
-const CLICK_TIME_THRESHOLD = 220;
-const TOUCH_TAP_TIME_THRESHOLD = 350;
+const CLICK_TIME_THRESHOLD = 10;
+const TOUCH_TAP_TIME_THRESHOLD = 10;
 const TOUCH_TAP_MOVE_THRESHOLD = 12;
+
+const POINTER_INFLUENCE_RADIUS = 50;
+const POINTER_FORCE_MULTIPLIER = 20;
 
 let manes = [];
 let ribbons = [];
@@ -227,14 +230,21 @@ class ManeStrand {
       const dy = mouseY - this.points[i].y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < 50 && mouseDown) {
+      if (dist < POINTER_INFLUENCE_RADIUS && mouseDown) {
         this.touched = true;
-        this.touchStrength = Math.max(this.touchStrength, 1 - dist / 50);
+        this.touchStrength = Math.max(
+          this.touchStrength,
+          1 - dist / POINTER_INFLUENCE_RADIUS,
+        );
 
-        const force = (50 - dist) / 50;
+        const force =
+          (POINTER_INFLUENCE_RADIUS - dist) / POINTER_INFLUENCE_RADIUS;
+
         if (dist > 0.0001) {
-          this.velocities[i].x += (dx / dist) * force * 10;
-          this.velocities[i].y += (dy / dist) * force * 10;
+          this.velocities[i].x +=
+            (dx / dist) * force * POINTER_FORCE_MULTIPLIER;
+          this.velocities[i].y +=
+            (dy / dist) * force * POINTER_FORCE_MULTIPLIER;
         }
       }
     }
@@ -278,8 +288,8 @@ class ManeStrand {
       this.points[i].x += this.velocities[i].x;
       this.points[i].y += this.velocities[i].y;
 
-      this.velocities[i].x *= 0.82;
-      this.velocities[i].y *= 0.82;
+      this.velocities[i].x *= 0.52;
+      this.velocities[i].y *= 0.52;
     }
 
     for (let pass = 0; pass < 3; pass++) {
@@ -502,7 +512,7 @@ function drawSpine() {
 
 function createRibbon(x, y) {
   const id = `${Date.now()}-${Math.random()}`;
-  const MAX_BIND_COUNT = 10;
+  const MAX_BIND_COUNT = 15;
   const candidateBindings = [];
 
   manes.forEach((mane) => {
