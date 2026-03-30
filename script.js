@@ -17,16 +17,18 @@ const TEXT_START_OFFSET = 40;
 const TEXT_REPEAT_GAP = 24;
 
 // 리본 관련
-const RIBBON_COLOR = "#2f6bff";
-const RIBBON_CAPTURE_RADIUS = 15;
-const RIBBON_TOGGLE_RADIUS = 22;
-const RIBBON_BIND_STRENGTH = 0.22;
-const RIBBON_DAMPING = 0.82;
+const RIBBON_CAPTURE_RADIUS = 20;
+const RIBBON_TOGGLE_RADIUS = 20;
+const RIBBON_BIND_STRENGTH = 0.42;
+const RIBBON_DAMPING = 0.72;
 const RIBBON_SIZE = 12;
+const RIBBON_SNAP_STRENGTH = 0.92;
 
 // 클릭 / 드래그 판정
 const CLICK_MOVE_THRESHOLD = 6;
-const CLICK_TIME_THRESHOLD = 320;
+const CLICK_TIME_THRESHOLD = 220;
+const TOUCH_TAP_TIME_THRESHOLD = 350;
+const TOUCH_TAP_MOVE_THRESHOLD = 12;
 
 let manes = [];
 let ribbons = [];
@@ -49,6 +51,13 @@ let arcCenterY = 0;
 let arcRadius = 0;
 let arcEndX = 0;
 let arcEndY = 0;
+
+function getRandomRibbonColor() {
+  const hue = Math.floor(Math.random() * 360);
+  const saturation = 70 + Math.random() * 20;
+  const lightness = 55 + Math.random() * 10;
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
@@ -163,7 +172,7 @@ class ManeStrand {
     this.touched = false;
     this.touchStrength = 0;
     this.windPhase = Math.random() * Math.PI * 2;
-    this.windSpeed = 0.02 + Math.random() * 0.03;
+    this.windSpeed = 0.01 + Math.random() * 0.015;
 
     this.boundRibbonId = null;
     this.boundSegmentIndex = null;
@@ -218,8 +227,8 @@ class ManeStrand {
 
         const force = (50 - dist) / 50;
         if (dist > 0.0001) {
-          this.velocities[i].x += (dx / dist) * force * 3;
-          this.velocities[i].y += (dy / dist) * force * 3;
+          this.velocities[i].x += (dx / dist) * force * 10;
+          this.velocities[i].y += (dy / dist) * force * 10;
         }
       }
     }
@@ -240,20 +249,24 @@ class ManeStrand {
           (Math.random() - 0.5) * this.touchStrength * 1.5;
       }
 
-      const returnForceX = (this.points[i].baseX - this.points[i].x) * 0.05;
-      const returnForceY = (this.points[i].baseY - this.points[i].y) * 0.05;
+      const isBoundPoint = boundRibbon && i === this.boundSegmentIndex;
+      const returnStrength = isBoundPoint ? 0 : 0.035;
+
+      const returnForceX =
+        (this.points[i].baseX - this.points[i].x) * returnStrength;
+      const returnForceY =
+        (this.points[i].baseY - this.points[i].y) * returnStrength;
       this.velocities[i].x += returnForceX;
       this.velocities[i].y += returnForceY;
 
       if (boundRibbon && i === this.boundSegmentIndex) {
-        const rdx = boundRibbon.x - this.points[i].x;
-        const rdy = boundRibbon.y - this.points[i].y;
+        this.velocities[i].x *= 0.35;
+        this.velocities[i].y *= 0.35;
 
-        this.velocities[i].x += rdx * RIBBON_BIND_STRENGTH;
-        this.velocities[i].y += rdy * RIBBON_BIND_STRENGTH;
-
-        this.velocities[i].x *= RIBBON_DAMPING;
-        this.velocities[i].y *= RIBBON_DAMPING;
+        this.points[i].x +=
+          (boundRibbon.x - this.points[i].x) * RIBBON_SNAP_STRENGTH;
+        this.points[i].y +=
+          (boundRibbon.y - this.points[i].y) * RIBBON_SNAP_STRENGTH;
       }
 
       this.points[i].x += this.velocities[i].x;
@@ -270,8 +283,8 @@ class ManeStrand {
       const ribbonNow = this.getBoundRibbon();
       if (ribbonNow && this.boundSegmentIndex !== null) {
         const idx = this.boundSegmentIndex;
-        this.points[idx].x += (ribbonNow.x - this.points[idx].x) * 0.45;
-        this.points[idx].y += (ribbonNow.y - this.points[idx].y) * 0.45;
+        this.points[idx].x = ribbonNow.x;
+        this.points[idx].y = ribbonNow.y;
       }
 
       for (let i = 1; i < this.points.length; i++) {
@@ -483,7 +496,7 @@ function drawSpine() {
 
 function createRibbon(x, y) {
   const id = `${Date.now()}-${Math.random()}`;
-  const MAX_BIND_COUNT = 3; // 🔥 묶을 갈기 개수 제한
+  const MAX_BIND_COUNT = 10;
   const candidateBindings = [];
 
   manes.forEach((mane) => {
@@ -507,16 +520,25 @@ function createRibbon(x, y) {
       candidateBindings.push({
         mane,
         segmentIndex: bestIndex,
+        dist: bestDist,
       });
     }
   });
 
   if (candidateBindings.length === 0) return;
 
-  const ribbon = { id, x, y };
+  candidateBindings.sort((a, b) => a.dist - b.dist);
+  const selectedBindings = candidateBindings.slice(0, MAX_BIND_COUNT);
+
+  const ribbon = {
+    id,
+    x,
+    y,
+    color: getRandomRibbonColor(),
+  };
   ribbons.push(ribbon);
 
-  candidateBindings.forEach(({ mane, segmentIndex }) => {
+  selectedBindings.forEach(({ mane, segmentIndex }) => {
     mane.bindToRibbon(id, segmentIndex);
   });
 }
@@ -553,13 +575,13 @@ function drawRibbon(ribbon) {
   ctx.save();
   ctx.translate(ribbon.x, ribbon.y);
 
-  ctx.strokeStyle = RIBBON_COLOR;
-  ctx.fillStyle = RIBBON_COLOR;
+  ctx.strokeStyle = ribbon.color;
+  ctx.fillStyle = ribbon.color;
   ctx.lineWidth = 3;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.shadowBlur = 10;
-  ctx.shadowColor = "rgba(47, 107, 255, 0.45)";
+  ctx.shadowColor = ribbon.color;
 
   ctx.beginPath();
   ctx.arc(0, 0, 4, 0, Math.PI * 2);
@@ -640,7 +662,7 @@ function movePointer(x, y) {
   }
 }
 
-function endPointer(x, y) {
+function endPointer(x, y, isTouch = false) {
   mouseX = x;
   mouseY = y;
   pointerCurrentX = x;
@@ -651,10 +673,15 @@ function endPointer(x, y) {
   const dy = pointerCurrentY - pointerStartY;
   const dist = Math.hypot(dx, dy);
 
+  const moveThreshold = isTouch
+    ? TOUCH_TAP_MOVE_THRESHOLD
+    : CLICK_MOVE_THRESHOLD;
+  const timeThreshold = isTouch
+    ? TOUCH_TAP_TIME_THRESHOLD
+    : CLICK_TIME_THRESHOLD;
+
   const isClick =
-    !pointerMoved &&
-    dist <= CLICK_MOVE_THRESHOLD &&
-    duration <= CLICK_TIME_THRESHOLD;
+    !pointerMoved && dist <= moveThreshold && duration <= timeThreshold;
 
   if (isClick) {
     handleBindTap(x, y);
@@ -725,7 +752,7 @@ canvas.addEventListener(
 );
 
 canvas.addEventListener("touchend", () => {
-  endPointer(pointerCurrentX, pointerCurrentY);
+  endPointer(pointerCurrentX, pointerCurrentY, true);
 });
 
 function animate() {
