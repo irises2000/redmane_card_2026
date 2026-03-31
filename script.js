@@ -318,6 +318,52 @@ function createNameModal() {
     overlay.remove();
   }
 
+  function showResultModal(text) {
+    const resultOverlay = document.createElement("div");
+    resultOverlay.className = "name-modal-overlay";
+
+    const resultModal = document.createElement("div");
+    resultModal.className = "name-modal";
+
+    const resultDesc = document.createElement("div");
+    resultDesc.className = "name-modal__desc";
+    resultDesc.textContent = text;
+
+    const resultButtonWrap = document.createElement("div");
+    resultButtonWrap.className = "name-modal__buttons";
+
+    const resultCloseBtn = document.createElement("button");
+    resultCloseBtn.className = "name-modal__button name-modal__button--cancel";
+    resultCloseBtn.textContent = "닫기";
+
+    const resultConfirmBtn = document.createElement("button");
+    resultConfirmBtn.className =
+      "name-modal__button name-modal__button--submit";
+    resultConfirmBtn.textContent = "확인";
+
+    function closeResultModal() {
+      GREETING_TEXT = "";
+      resultOverlay.remove();
+    }
+
+    resultCloseBtn.addEventListener("click", closeResultModal);
+    resultConfirmBtn.addEventListener("click", closeResultModal);
+
+    resultOverlay.addEventListener("click", (e) => {
+      if (e.target === resultOverlay) {
+        closeResultModal();
+      }
+    });
+
+    resultButtonWrap.appendChild(resultCloseBtn);
+    resultButtonWrap.appendChild(resultConfirmBtn);
+
+    resultModal.appendChild(resultDesc);
+    resultModal.appendChild(resultButtonWrap);
+    resultOverlay.appendChild(resultModal);
+    document.body.appendChild(resultOverlay);
+  }
+
   async function submitName() {
     const cleanedInput = cleanCell(input.value);
 
@@ -337,8 +383,8 @@ function createNameModal() {
 
     // 2) name 있고 letter 비어 있음
     if (matchedRow && !matchedRow.letter) {
-      GREETING_TEXT = `${matchedRow.name}님, 아직 답변중`;
       closeModal();
+      showResultModal("아직 편지를 완성하지 못했습니다");
       return;
     }
 
@@ -348,9 +394,9 @@ function createNameModal() {
     const result = await addNameToSheet(cleanedInput);
 
     if (result.success) {
-      GREETING_TEXT = `${cleanedInput}님, 이름 추가됨`;
       sheetRows.push({ name: cleanedInput, letter: "" });
       closeModal();
+      showResultModal("잠재적 수취인에 추가됨");
     } else {
       message.textContent = result.message || "이름 추가에 실패했어요.";
       console.warn("Name add failed:", result);
