@@ -2,49 +2,45 @@ const canvas = document.getElementById("maneCanvas");
 const ctx = canvas.getContext("2d");
 
 /* =========================
-   1) 전체 비주얼 기본 설정
-   - 배경색, 갈기/척추 기본 구조
+   1) 기본 비주얼 설정
 ========================= */
 const BG_COLOR = "#c41e3a";
 const SPINE_COLOR = "#c41e3a";
 
-const MANE_SEGMENTS = 10; // 갈기 한 가닥의 세그먼트 수
-const MANE_LENGTH_RATIO = 15; // 갈기 길이 비율
-const THICK_PORTION = 0.6; // 갈기 두꺼운 구간 비율
-const MANE_ROOT_JITTER = 6; // 갈기 시작점 랜덤 흔들림
+const MANE_SEGMENTS = 10;
+const MANE_LENGTH_RATIO = 15;
+const THICK_PORTION = 0.6;
+const MANE_ROOT_JITTER = 3;
 
 /* =========================
    2) 텍스트 설정
-   - 시트에서 가져온 문장이 spine을 따라 배치됨
 ========================= */
 let GREETING_TEXT = "";
 const TEXT_COLOR = "rgba(255, 235, 215, 0.9)";
 const TEXT_FONT_FAMILY = '"Times New Roman", serif';
 const TEXT_WEIGHT = "150";
-const TEXT_SIZE_RATIO = 0.01; // 화면 대비 텍스트 크기
-const TEXT_START_OFFSET = 40; // spine 시작점으로부터 텍스트 시작 위치
+const TEXT_SIZE_RATIO = 0.01;
+const TEXT_START_OFFSET = 40;
 
 /* =========================
    3) 구글 시트 CSV 주소
-   - name / letter 컬럼을 읽음
 ========================= */
 const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRKi5g-6wPn9FoAMVi82Exy8t1sluR2jNqjXgtB4eCB1U6ncqyl69d60CWrd10e4F_2eW2v7Gl9Jubs/pub?gid=0&single=true&output=csv";
 
 /* =========================
-   4) 구슬(묶임 포인트) 관련 설정
-   - 클릭하면 갈기들이 이 점으로 모임
+   4) 구슬/묶임 설정
 ========================= */
-const RIBBON_CAPTURE_RADIUS = 30; // 클릭한 점 주변 갈기 포착 반경
-const RIBBON_TOGGLE_RADIUS = 12; // 이미 있는 구슬 제거 클릭 반경
-const RIBBON_BIND_STRENGTH = 0.42; // 현재 실사용 거의 없음
-const RIBBON_DAMPING = 0.72; // 현재 실사용 거의 없음
-const RIBBON_SIZE = 12; // 예전 리본 기준 값, 지금은 거의 사용 안 함
-const RIBBON_SNAP_STRENGTH = 0.97; // 묶인 갈기가 구슬 위치로 스냅되는 강도
+const RIBBON_CAPTURE_RADIUS = 40;
+const RIBBON_TOGGLE_RADIUS = 12;
+const RIBBON_BIND_STRENGTH = 0.42;
+const RIBBON_DAMPING = 0.72;
+const RIBBON_SIZE = 12;
+const RIBBON_SNAP_STRENGTH = 0.97;
+const BEAD_RADIUS = 8;
 
 /* =========================
    5) 클릭 / 드래그 판정
-   - 클릭인지, 그냥 쓸어넘긴 건지 구분
 ========================= */
 const CLICK_MOVE_THRESHOLD = 6;
 const CLICK_TIME_THRESHOLD = 10;
@@ -52,8 +48,7 @@ const TOUCH_TAP_TIME_THRESHOLD = 10;
 const TOUCH_TAP_MOVE_THRESHOLD = 12;
 
 /* =========================
-   6) 마우스로 갈기 쓰다듬는 힘
-   - 묶임 말고, 평소 마우스 인터랙션 세기
+   6) 마우스 힘
 ========================= */
 const POINTER_INFLUENCE_RADIUS = 70;
 const POINTER_FORCE_MULTIPLIER = 20;
@@ -65,7 +60,6 @@ let manes = [];
 let ribbons = [];
 let sheetRows = [];
 
-// 포인터 상태
 let mouseX = 0;
 let mouseY = 0;
 let mouseDown = false;
@@ -77,7 +71,6 @@ let pointerCurrentY = 0;
 let pointerDownTime = 0;
 let pointerMoved = false;
 
-// 곡선 spine 배치 정보
 let arcCenterX = 0;
 let arcCenterY = 0;
 let arcRadius = 0;
@@ -87,22 +80,58 @@ let arcEndY = 0;
 /* =========================
    8) 랜덤 구슬 색상
 ========================= */
-// function getRandomRibbonColor() {
-//   const hue = Math.floor(Math.random() * 360);
-//   const saturation = 70 + Math.random() * 20;
-//   const lightness = 55 + Math.random() * 10;
-//   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-// }
-
 function getRandomRibbonColor() {
-  return "rgb(20, 20, 20)";
+  const hue = Math.floor(Math.random() * 360);
+  const saturation = 65 + Math.random() * 25;
+  const lightness = 35 + Math.random() * 20;
+
+  return {
+    h: hue,
+    s: saturation,
+    l: lightness,
+    base: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+    mid: `hsl(${hue}, ${saturation}%, ${Math.min(lightness + 12, 82)}%)`,
+    highlight: `hsl(${hue}, ${Math.max(saturation - 10, 30)}%, ${Math.min(
+      lightness + 28,
+      92,
+    )}%)`,
+  };
 }
 
 /* =========================
-   9) 텍스트 / 시트 / 모달 관련
+   9) 색 혼합 유틸
 ========================= */
+function colorToRGB(color) {
+  const temp = document.createElement("canvas");
+  const tctx = temp.getContext("2d");
+  tctx.fillStyle = color;
+  const parsed = tctx.fillStyle;
+  const match = parsed.match(/\d+/g);
 
-// 셀 문자열 정리
+  if (!match || match.length < 3) {
+    return { r: 0, g: 0, b: 0 };
+  }
+
+  return {
+    r: Number(match[0]),
+    g: Number(match[1]),
+    b: Number(match[2]),
+  };
+}
+
+function mixWithWhite(color, amount = 0.5) {
+  const { r, g, b } = colorToRGB(color);
+
+  const nr = Math.round(r + (255 - r) * amount);
+  const ng = Math.round(g + (255 - g) * amount);
+  const nb = Math.round(b + (255 - b) * amount);
+
+  return `rgb(${nr}, ${ng}, ${nb})`;
+}
+
+/* =========================
+   10) 시트 유틸
+========================= */
 function cleanCell(value) {
   return String(value ?? "")
     .replace(/^\uFEFF/, "")
@@ -112,12 +141,10 @@ function cleanCell(value) {
     .trim();
 }
 
-// 이름 비교용 정규화
 function normalizeName(value) {
   return cleanCell(value).normalize("NFC").replace(/\s+/g, "").toLowerCase();
 }
 
-// CSV 한 줄 파싱
 function parseCSVLine(line) {
   const result = [];
   let current = "";
@@ -146,7 +173,6 @@ function parseCSVLine(line) {
   return result;
 }
 
-// 시트 데이터 전체 로드
 async function loadSheetRows() {
   try {
     const res = await fetch(SHEET_CSV_URL);
@@ -190,94 +216,48 @@ async function loadSheetRows() {
   }
 }
 
-// 입력 이름과 일치하는 행 찾기
 function findLetterRowByName(inputName) {
   const normalizedInput = normalizeName(inputName);
   return sheetRows.find((row) => normalizeName(row.name) === normalizedInput);
 }
 
-// 시작 시 뜨는 이름 입력 모달
+/* =========================
+   11) 이름 입력 모달
+========================= */
 function createNameModal() {
   const overlay = document.createElement("div");
-  overlay.id = "nameModalOverlay";
-  overlay.style.position = "fixed";
-  overlay.style.inset = "0";
-  overlay.style.background = "rgba(0, 0, 0, 0)";
-  overlay.style.display = "flex";
-  overlay.style.alignItems = "center";
-  overlay.style.justifyContent = "center";
-  overlay.style.zIndex = "9999";
-  overlay.style.backdropFilter = "blur(3px)";
+  overlay.className = "name-modal-overlay";
 
   const modal = document.createElement("div");
-  modal.style.width = "min(60vw, 420px)";
-  modal.style.background = "rgb(0, 0, 0)";
-  modal.style.borderRadius = "18px";
-  modal.style.padding = "22px 20px 18px";
-  modal.style.boxShadow = "0 18px 45px rgba(0,0,0,0.18)";
-  modal.style.fontFamily =
-    'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  modal.style.color = "#6e1e2f";
+  modal.className = "name-modal";
 
   const title = document.createElement("div");
+  title.className = "name-modal__title";
   title.textContent = "";
-  title.style.fontSize = "20px";
-  title.style.fontWeight = "700";
-  title.style.marginBottom = "10px";
 
   const desc = document.createElement("div");
+  desc.className = "name-modal__desc";
   desc.textContent = "";
-  desc.style.fontSize = "14px";
-  desc.style.lineHeight = "1.5";
-  desc.style.opacity = "0.8";
-  desc.style.marginBottom = "14px";
 
   const input = document.createElement("input");
+  input.className = "name-modal__input";
   input.type = "text";
   input.placeholder = "수취인은 누구신지요";
   input.autocomplete = "off";
-  input.style.width = "100%";
-  input.style.boxSizing = "border-box";
-  input.style.padding = "14px 16px";
-  input.style.borderRadius = "12px";
-  input.style.border = "1px solid rgba(110,30,47,0.16)";
-  input.style.outline = "none";
-  input.style.fontSize = "16px";
-  input.style.background = "white";
-  input.style.marginBottom = "12px";
 
   const message = document.createElement("div");
-  message.style.minHeight = "20px";
-  message.style.fontSize = "13px";
-  message.style.color = "#b03b4f";
-  message.style.marginBottom = "12px";
+  message.className = "name-modal__message";
 
   const buttonWrap = document.createElement("div");
-  buttonWrap.style.display = "flex";
-  buttonWrap.style.justifyContent = "flex-end";
-  buttonWrap.style.gap = "8px";
+  buttonWrap.className = "name-modal__buttons";
 
   const cancelBtn = document.createElement("button");
+  cancelBtn.className = "name-modal__button name-modal__button--cancel";
   cancelBtn.textContent = "닫기";
-  cancelBtn.style.border = "none";
-  cancelBtn.style.background = "rgba(110,30,47,0.08)";
-  cancelBtn.style.color = "#6e1e2f";
-  cancelBtn.style.padding = "12px 18px";
-  cancelBtn.style.borderRadius = "999px";
-  cancelBtn.style.cursor = "pointer";
-  cancelBtn.style.fontSize = "14px";
-  cancelBtn.style.fontWeight = "700";
 
   const submitBtn = document.createElement("button");
+  submitBtn.className = "name-modal__button name-modal__button--submit";
   submitBtn.textContent = "확인";
-  submitBtn.style.border = "none";
-  submitBtn.style.background = "#c41e3a";
-  submitBtn.style.color = "white";
-  submitBtn.style.padding = "12px 18px";
-  submitBtn.style.borderRadius = "999px";
-  submitBtn.style.cursor = "pointer";
-  submitBtn.style.fontSize = "14px";
-  submitBtn.style.fontWeight = "700";
 
   buttonWrap.appendChild(cancelBtn);
   buttonWrap.appendChild(submitBtn);
@@ -351,9 +331,8 @@ function createNameModal() {
 }
 
 /* =========================
-   10) 캔버스 / 갈기 배치
+   12) 캔버스 / 갈기 배치
 ========================= */
-
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -367,7 +346,7 @@ function getLayoutValues() {
   const thickLimit = Math.floor((MANE_SEGMENTS + 1) * THICK_PORTION);
   const thickManeLength = thickLimit * segmentLength;
 
-  const verticalRootX = canvas.width - thickManeLength;
+  const verticalRootX = canvas.width * 0.5;
   const R = verticalRootX;
 
   const cx = 0;
@@ -407,7 +386,7 @@ function initManes() {
   manes = [];
 
   const layout = getLayoutValues();
-  const spacing = 5;
+  const spacing = 4;
 
   arcCenterX = layout.cx;
   arcCenterY = layout.cy;
@@ -458,9 +437,7 @@ function initManes() {
 }
 
 /* =========================
-   11) 갈기 한 가닥 클래스
-   - update(): 물리 계산
-   - draw(): 갈기 렌더링
+   13) 갈기 한 가닥 클래스
 ========================= */
 class ManeStrand {
   constructor(x, y, dirX, dirY, index, total) {
@@ -471,7 +448,10 @@ class ManeStrand {
 
     this.index = index;
     this.segments = MANE_SEGMENTS;
-    this.segmentLength = canvas.width / MANE_LENGTH_RATIO;
+
+    // 갈기 총 길이 = 화면 가로의 절반
+    this.segmentLength = (canvas.width * 0.5) / MANE_SEGMENTS;
+
     this.points = [];
     this.velocities = [];
     this.touched = false;
@@ -482,8 +462,9 @@ class ManeStrand {
     this.boundRibbonId = null;
     this.boundSegmentIndex = null;
 
-    const hue = 0 + (index / total) * 20;
+    const hue = 5 + (index / total) * 20;
     this.color = `hsl(${hue}, 85%, 55%)`;
+    this.rootColor = `hsl(${hue}, 95%, 72%)`;
 
     for (let i = 0; i <= this.segments; i++) {
       const px = x + i * this.segmentLength * this.dirX;
@@ -646,33 +627,16 @@ class ManeStrand {
       last.x,
       last.y,
     );
-    gradient.addColorStop(0, this.color);
+    gradient.addColorStop(0, this.rootColor);
+    gradient.addColorStop(0.15, this.color);
     gradient.addColorStop(0.5, this.color);
     gradient.addColorStop(1, "rgba(196, 30, 58, 0)");
 
     ctx.strokeStyle = gradient;
-    ctx.lineWidth = 1;
-    ctx.lineCap = "round";
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = this.color;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(this.points[0].x, this.points[0].y);
-
-    const thickLimit = Math.floor((this.segments + 1) * THICK_PORTION);
-
-    for (let i = 1; i < thickLimit; i++) {
-      const xc = (this.points[i].x + this.points[i + 1].x) / 2;
-      const yc = (this.points[i].y + this.points[i + 1].y) / 2;
-      ctx.quadraticCurveTo(this.points[i].x, this.points[i].y, xc, yc);
-    }
-
-    ctx.strokeStyle = this.color;
-    ctx.lineWidth = 4 - (this.index % 2);
+    ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
     ctx.shadowBlur = 10;
-    ctx.shadowColor = this.color;
+    ctx.shadowColor = this.rootColor;
     ctx.stroke();
 
     ctx.restore();
@@ -680,8 +644,7 @@ class ManeStrand {
 }
 
 /* =========================
-   12) 텍스트 spine 위에 그리기
-   - 글자 위치/크기 수정할 때 여기 참고
+   14) 텍스트 그리기
 ========================= */
 function getTextFontSize() {
   return Math.max(18, canvas.width * TEXT_SIZE_RATIO);
@@ -775,8 +738,7 @@ function drawTextOnSpine() {
 }
 
 /* =========================
-   13) spine 자체 그리기
-   - 현재 animate에서 꺼져 있음
+   15) spine 라인
 ========================= */
 function drawSpine() {
   const layout = getLayoutValues();
@@ -809,7 +771,7 @@ function drawSpine() {
 }
 
 /* =========================
-   14) 구슬 생성 / 제거 / 찾기
+   16) 구슬 생성 / 제거 / 탐색
 ========================= */
 function createRibbon(x, y) {
   const id = `${Date.now()}-${Math.random()}`;
@@ -889,56 +851,32 @@ function findRibbonAtPoint(x, y) {
 }
 
 /* =========================
-   15) 구슬 그리기
+   17) 구슬 렌더링
 ========================= */
 function drawRibbon(ribbon) {
   ctx.save();
   ctx.translate(ribbon.x, ribbon.y);
 
-  const radius = 10;
+  const radius = BEAD_RADIUS;
 
-  // 아주 은은한 밝은 광만 남김
-  // ctx.shadowBlur = 8;
-  // ctx.shadowColor = "rgba(255,255,255,0.22)";
-
-  // 메인 구슬 그라디언트
   const beadGradient = ctx.createRadialGradient(
-    -radius * 0.35,
-    -radius * 0.4,
-    radius * 0.15,
+    -radius * 0.28,
+    -radius * 0.3,
+    radius * 0.08,
     0,
     0,
     radius,
   );
-  beadGradient.addColorStop(0, "rgba(76, 76, 76, 0.96)");
-  beadGradient.addColorStop(0.2, "rgba(29, 29, 29, 0.72)");
-  beadGradient.addColorStop(0.38, ribbon.color);
-  beadGradient.addColorStop(1, ribbon.color);
+
+  beadGradient.addColorStop(0, ribbon.color.highlight);
+  beadGradient.addColorStop(0.22, ribbon.color.mid);
+  beadGradient.addColorStop(0.5, ribbon.color.base);
+  beadGradient.addColorStop(1, ribbon.color.base);
 
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fillStyle = beadGradient;
   ctx.fill();
-
-  // 하이라이트 큰 점
-  // ctx.shadowBlur = 0;
-  // ctx.beginPath();
-  // ctx.arc(-radius * 0.34, -radius * 0.34, radius * 0.24, 0, Math.PI * 2);
-  // ctx.fillStyle = "rgba(255,255,255,0.92)";
-  // ctx.fill();
-
-  // 하이라이트 작은 점
-  // ctx.beginPath();
-  // ctx.arc(-radius * 0.06, -radius * 0.1, radius * 0.09, 0, Math.PI * 2);
-  // ctx.fillStyle = "rgba(255,255,255,0.58)";
-  // ctx.fill();
-
-  // 밝은 외곽선
-  // ctx.beginPath();
-  // ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  // ctx.lineWidth = 1;
-  // ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  // ctx.stroke();
 
   ctx.restore();
 }
@@ -959,8 +897,7 @@ function handleBindTap(x, y) {
 }
 
 /* =========================
-   16) 포인터 입력 처리
-   - 클릭/드래그/터치
+   18) 포인터 입력 처리
 ========================= */
 function beginPointer(x, y) {
   mouseX = x;
@@ -1019,7 +956,7 @@ function endPointer(x, y, isTouch = false) {
 }
 
 /* =========================
-   17) 이벤트 등록
+   19) 이벤트 등록
 ========================= */
 canvas.addEventListener("mousemove", (e) => {
   const rect = canvas.getBoundingClientRect();
@@ -1038,7 +975,6 @@ canvas.addEventListener("mousedown", (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-
   beginPointer(x, y);
 });
 
@@ -1046,7 +982,6 @@ canvas.addEventListener("mouseup", (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-
   endPointer(x, y);
 });
 
@@ -1061,7 +996,6 @@ canvas.addEventListener(
     const touch = e.touches[0];
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
-
     beginPointer(x, y);
   },
   { passive: true },
@@ -1075,7 +1009,6 @@ canvas.addEventListener(
     const touch = e.touches[0];
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
-
     movePointer(x, y);
   },
   { passive: false },
@@ -1086,7 +1019,7 @@ canvas.addEventListener("touchend", () => {
 });
 
 /* =========================
-   18) 렌더 루프
+   20) 렌더 루프
 ========================= */
 function animate() {
   ctx.fillStyle = BG_COLOR;
@@ -1106,7 +1039,7 @@ function animate() {
 }
 
 /* =========================
-   19) 시작
+   21) 시작
 ========================= */
 async function init() {
   resizeCanvas();
