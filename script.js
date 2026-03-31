@@ -410,7 +410,7 @@ function initManes() {
   manes = [];
 
   const layout = getLayoutValues();
-  const spacing = 4;
+  const spacing = 5;
   const maneCount = Math.max(2, Math.floor(layout.totalLen / spacing));
 
   for (let i = 0; i < maneCount; i++) {
