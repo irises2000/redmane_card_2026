@@ -674,7 +674,17 @@ class ManeStrand {
     const last = this.points[this.points.length - 1];
     ctx.lineTo(last.x, last.y);
 
-    ctx.strokeStyle = this.color;
+    const gradient = ctx.createLinearGradient(
+      this.points[0].x,
+      this.points[0].y,
+      last.x,
+      last.y,
+    );
+    gradient.addColorStop(0, this.rootColor);
+    gradient.addColorStop(0.8, this.color);
+    gradient.addColorStop(1, "rgba(196, 30, 58, 0)");
+
+    ctx.strokeStyle = gradient;
 
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
