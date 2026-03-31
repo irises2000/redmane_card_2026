@@ -7,8 +7,8 @@ const ctx = canvas.getContext("2d");
 /* =========================
    1) 기본 비주얼 설정
 ========================= */
-const BG_COLOR = "#c90028";
-const SPINE_COLOR = "#c90028";
+const BG_COLOR = "#c41e3a";
+const SPINE_COLOR = "#c41e3a";
 
 const MANE_SEGMENTS = 10;
 const MANE_LENGTH_RATIO = 15;
@@ -514,7 +514,7 @@ class ManeStrand {
 
     this.bindings = [];
 
-    const hue = 5 + (index / total) * 25;
+    const hue = 0 + (index / total) * 30;
     this.color = `hsl(${hue}, 85%, 55%)`;
     this.rootColor = `hsl(${hue}, 95%, 72%)`;
 
@@ -695,7 +695,7 @@ class ManeStrand {
 
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
-    ctx.shadowBlur = 7;
+    ctx.shadowBlur = 5;
     ctx.shadowColor = this.rootColor;
     ctx.stroke();
 
