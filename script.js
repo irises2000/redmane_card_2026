@@ -678,7 +678,7 @@ class ManeStrand {
 
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = 5;
     ctx.shadowColor = this.rootColor;
     ctx.stroke();
 
