@@ -4,8 +4,8 @@ export const ctx = canvas.getContext("2d");
 /* =========================
    1) 기본 비주얼 설정
 ========================= */
-export const BG_COLOR = "#bc0927";
-export const SPINE_COLOR = "#bc0927";
+export const BG_COLOR = "#bc0924";
+export const SPINE_COLOR = "#bc0924";
 
 export const MANE_SEGMENTS = 10;
 export const MANE_LENGTH_RATIO = 15;
