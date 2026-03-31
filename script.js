@@ -402,7 +402,7 @@ function getLayoutValues() {
   const R = verticalRootX;
 
   const cx = 0;
-  const cy = thickManeLength + R;
+  const cy = thickManeLength + 40 + R;
 
   const startAngle = -Math.PI / 2;
   const endAngle = 0;
