@@ -4,6 +4,16 @@
   box-sizing: border-box;
 }
 
+@font-face {
+  font-family: "MyLocalFont";
+  src: url("./fonts/SSShinb7Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  margin: 0;
+}
 body {
   min-height: 100vh;
   background: #ff2146;

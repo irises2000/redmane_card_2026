@@ -19,8 +19,8 @@ const MANE_ROOT_JITTER = 3;
    2) 텍스트 설정
 ========================= */
 let GREETING_TEXT = "";
-const TEXT_COLOR = "rgba(255, 235, 215, 0.9)";
-const TEXT_FONT_FAMILY = '"Times New Roman", serif';
+const TEXT_COLOR = "rgba(255, 168, 168, 0.9)";
+const TEXT_FONT_FAMILY = '"MyLocalFont", serif';
 const TEXT_WEIGHT = "150";
 const TEXT_SIZE_RATIO = 0.01;
 const TEXT_START_OFFSET = 40;
@@ -1148,6 +1148,9 @@ function animate() {
 async function init() {
   resizeCanvas();
   window.addEventListener("resize", resizeCanvas);
+
+  await document.fonts.load('16px "MyLocalFont"');
+  await document.fonts.ready;
 
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
