@@ -13,7 +13,7 @@ const SPINE_COLOR = "#c41e3a";
 const MANE_SEGMENTS = 10;
 const MANE_LENGTH_RATIO = 15;
 const THICK_PORTION = 0.6;
-const MANE_ROOT_JITTER = 3;
+const MANE_ROOT_JITTER = 1;
 
 /* =========================
    2) 텍스트 설정
