@@ -13,7 +13,7 @@ const SPINE_COLOR = "#c41e3a";
 const MANE_SEGMENTS = 10;
 const MANE_LENGTH_RATIO = 15;
 const THICK_PORTION = 0.6;
-const MANE_ROOT_JITTER = 1;
+const MANE_ROOT_JITTER = 3;
 
 /* =========================
    2) 텍스트 설정
@@ -438,7 +438,7 @@ function initManes() {
   manes = [];
 
   const layout = getLayoutValues();
-  const spacing = 7;
+  const spacing = 4;
 
   arcCenterX = layout.cx;
   arcCenterY = layout.cy;
@@ -510,7 +510,7 @@ class ManeStrand {
     this.touched = false;
     this.touchStrength = 0;
     this.windPhase = Math.random() * Math.PI * 2;
-    this.windSpeed = 0.008 + Math.random() * 0.006;
+    this.windSpeed = 0.02 + Math.random() * 0.015;
 
     this.boundRibbonId = null;
     this.boundSegmentIndex = null;
@@ -584,9 +584,9 @@ class ManeStrand {
     for (let i = 1; i < this.points.length; i++) {
       this.velocities[i].y += 0.15;
 
-      const windStrength = Math.sin(this.windPhase + i * 0.3) * 0.2;
-      this.velocities[i].x += windStrength * 0.06;
-      this.velocities[i].y += Math.cos(this.windPhase + i * 0.5) * 0.05;
+      const windStrength = Math.sin(this.windPhase + i * 0.3) * 0.3;
+      this.velocities[i].x += windStrength * 0.1;
+      this.velocities[i].y += Math.cos(this.windPhase + i * 0.5) * 0.08;
 
       if (this.touched) {
         this.velocities[i].x +=
@@ -622,7 +622,7 @@ class ManeStrand {
       this.velocities[i].y *= 0.52;
     }
 
-    for (let pass = 0; pass < 2; pass++) {
+    for (let pass = 0; pass < 3; pass++) {
       this.points[0].x = this.points[0].baseX;
       this.points[0].y = this.points[0].baseY;
 
@@ -686,9 +686,9 @@ class ManeStrand {
     gradient.addColorStop(1, "rgba(196, 30, 58, 0)");
 
     ctx.strokeStyle = gradient;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
-    ctx.shadowBlur = 5;
+    ctx.shadowBlur = 10;
     ctx.shadowColor = this.rootColor;
     ctx.stroke();
 
