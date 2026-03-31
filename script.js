@@ -512,8 +512,7 @@ class ManeStrand {
     this.windPhase = Math.random() * Math.PI * 2;
     this.windSpeed = 0.02 + Math.random() * 0.015;
 
-    this.boundRibbonId = null;
-    this.boundSegmentIndex = null;
+    this.bindings = [];
 
     const hue = 5 + (index / total) * 25;
     this.color = `hsl(${hue}, 85%, 55%)`;
@@ -534,19 +533,35 @@ class ManeStrand {
     }
   }
 
-  getBoundRibbon() {
-    if (this.boundRibbonId === null) return null;
-    return ribbons.find((r) => r.id === this.boundRibbonId) || null;
+  getBindings() {
+    return this.bindings
+      .map((binding) => {
+        const ribbon = ribbons.find((r) => r.id === binding.ribbonId);
+        if (!ribbon) return null;
+        return {
+          ribbon,
+          segmentIndex: binding.segmentIndex,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  isSegmentBound(segmentIndex) {
+    return this.bindings.some((b) => b.segmentIndex === segmentIndex);
   }
 
   bindToRibbon(ribbonId, segmentIndex) {
-    this.boundRibbonId = ribbonId;
-    this.boundSegmentIndex = segmentIndex;
+    if (this.isSegmentBound(segmentIndex)) return false;
+
+    this.bindings.push({
+      ribbonId,
+      segmentIndex,
+    });
+    return true;
   }
 
-  unbindRibbon() {
-    this.boundRibbonId = null;
-    this.boundSegmentIndex = null;
+  unbindRibbon(ribbonId) {
+    this.bindings = this.bindings.filter((b) => b.ribbonId !== ribbonId);
   }
 
   update(mouseX, mouseY, mouseDown) {
@@ -579,7 +594,7 @@ class ManeStrand {
       }
     }
 
-    const boundRibbon = this.getBoundRibbon();
+    const bindings = this.getBindings();
 
     for (let i = 1; i < this.points.length; i++) {
       this.velocities[i].y += 0.15;
@@ -595,7 +610,8 @@ class ManeStrand {
           (Math.random() - 0.5) * this.touchStrength * 0.35;
       }
 
-      const isBoundPoint = boundRibbon && i === this.boundSegmentIndex;
+      const bindingAtPoint = bindings.find((b) => b.segmentIndex === i);
+      const isBoundPoint = !!bindingAtPoint;
       const returnStrength = isBoundPoint ? 0 : 0.035;
 
       const returnForceX =
@@ -605,14 +621,16 @@ class ManeStrand {
       this.velocities[i].x += returnForceX;
       this.velocities[i].y += returnForceY;
 
-      if (boundRibbon && i === this.boundSegmentIndex) {
+      if (bindingAtPoint) {
+        const targetRibbon = bindingAtPoint.ribbon;
+
         this.velocities[i].x *= 0.35;
         this.velocities[i].y *= 0.35;
 
         this.points[i].x +=
-          (boundRibbon.x - this.points[i].x) * RIBBON_SNAP_STRENGTH;
+          (targetRibbon.x - this.points[i].x) * RIBBON_SNAP_STRENGTH;
         this.points[i].y +=
-          (boundRibbon.y - this.points[i].y) * RIBBON_SNAP_STRENGTH;
+          (targetRibbon.y - this.points[i].y) * RIBBON_SNAP_STRENGTH;
       }
 
       this.points[i].x += this.velocities[i].x;
@@ -626,12 +644,11 @@ class ManeStrand {
       this.points[0].x = this.points[0].baseX;
       this.points[0].y = this.points[0].baseY;
 
-      const ribbonNow = this.getBoundRibbon();
-      if (ribbonNow && this.boundSegmentIndex !== null) {
-        const idx = this.boundSegmentIndex;
-        this.points[idx].x = ribbonNow.x;
-        this.points[idx].y = ribbonNow.y;
-      }
+      const bindingsNow = this.getBindings();
+      bindingsNow.forEach(({ ribbon, segmentIndex }) => {
+        this.points[segmentIndex].x = ribbon.x;
+        this.points[segmentIndex].y = ribbon.y;
+      });
 
       for (let i = 1; i < this.points.length; i++) {
         const dx = this.points[i].x - this.points[i - 1].x;
@@ -822,12 +839,12 @@ function createRibbon(x, y) {
   const candidateBindings = [];
 
   manes.forEach((mane) => {
-    if (mane.boundRibbonId !== null) return;
-
     let bestIndex = -1;
     let bestDist = Infinity;
 
     for (let i = 1; i < mane.points.length; i++) {
+      if (mane.isSegmentBound(i)) continue;
+
       const dx = x - mane.points[i].x;
       const dy = y - mane.points[i].y;
       const dist = Math.hypot(dx, dy);
@@ -869,9 +886,7 @@ function removeRibbon(ribbonId) {
   ribbons = ribbons.filter((r) => r.id !== ribbonId);
 
   manes.forEach((mane) => {
-    if (mane.boundRibbonId === ribbonId) {
-      mane.unbindRibbon();
-    }
+    mane.unbindRibbon(ribbonId);
   });
 }
 
