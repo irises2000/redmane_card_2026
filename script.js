@@ -7,8 +7,8 @@ const ctx = canvas.getContext("2d");
 /* =========================
    1) 기본 비주얼 설정
 ========================= */
-const BG_COLOR = "#c41e3a";
-const SPINE_COLOR = "#c41e3a";
+const BG_COLOR = "#ff2146";
+const SPINE_COLOR = "#ff2146";
 
 const MANE_SEGMENTS = 10;
 const MANE_LENGTH_RATIO = 15;
