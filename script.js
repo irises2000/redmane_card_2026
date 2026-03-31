@@ -510,7 +510,7 @@ class ManeStrand {
     this.touched = false;
     this.touchStrength = 0;
     this.windPhase = Math.random() * Math.PI * 2;
-    this.windSpeed = 0.02 + Math.random() * 0.015;
+    this.windSpeed = 0.04 + Math.random() * 0.02;
 
     this.bindings = [];
 
