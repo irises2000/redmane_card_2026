@@ -515,7 +515,7 @@ class ManeStrand {
     this.boundRibbonId = null;
     this.boundSegmentIndex = null;
 
-    const hue = 5 + (index / total) * 20;
+    const hue = 5 + (index / total) * 25;
     this.color = `hsl(${hue}, 85%, 55%)`;
     this.rootColor = `hsl(${hue}, 95%, 72%)`;
 
@@ -674,17 +674,7 @@ class ManeStrand {
     const last = this.points[this.points.length - 1];
     ctx.lineTo(last.x, last.y);
 
-    const gradient = ctx.createLinearGradient(
-      this.points[0].x,
-      this.points[0].y,
-      last.x,
-      last.y,
-    );
-    gradient.addColorStop(0, this.rootColor);
-    gradient.addColorStop(0.8, this.color);
-    gradient.addColorStop(1, "rgba(196, 30, 58, 0)");
-
-    ctx.strokeStyle = gradient;
+    ctx.strokeStyle = this.color;
 
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
