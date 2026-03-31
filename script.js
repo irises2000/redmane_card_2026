@@ -37,11 +37,11 @@ const SHEET_WRITE_URL =
 /* =========================
    4) 구슬/묶임 설정
 ========================= */
-const RIBBON_CAPTURE_RADIUS = 40;
+const RIBBON_CAPTURE_RADIUS = 30;
 const RIBBON_TOGGLE_RADIUS = 12;
-const RIBBON_BIND_STRENGTH = 0.42;
+const RIBBON_BIND_STRENGTH = 0.5;
 const RIBBON_DAMPING = 0.72;
-const RIBBON_SIZE = 12;
+const RIBBON_SIZE = 10;
 const RIBBON_SNAP_STRENGTH = 0.97;
 const BEAD_RADIUS = 8;
 
@@ -881,7 +881,7 @@ function drawSpine() {
 ========================= */
 function createRibbon(x, y) {
   const id = `${Date.now()}-${Math.random()}`;
-  const MAX_BIND_COUNT = 15;
+  const MAX_BIND_COUNT = 20;
   const candidateBindings = [];
 
   manes.forEach((mane) => {
