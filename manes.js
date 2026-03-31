@@ -106,20 +106,7 @@ export function initManes(getRibbonById) {
       dirY = 0;
     }
 
-    const jitterX = (Math.random() - 0.5) * MANE_ROOT_JITTER;
-    const jitterY = (Math.random() - 0.5) * MANE_ROOT_JITTER;
-
-    manes.push(
-      new ManeStrand(
-        x + jitterX,
-        y + jitterY,
-        dirX,
-        dirY,
-        i,
-        maneCount,
-        getRibbonById,
-      ),
-    );
+    manes.push(new ManeStrand(x, y, dirX, dirY, i, maneCount, getRibbonById));
   }
 }
 
