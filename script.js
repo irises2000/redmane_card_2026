@@ -55,7 +55,7 @@ const BEAD_RADIUS = 8;
 /* =========================
    4-1) 사운드 설정
 ========================= */
-const ribbonSound = new Audio("./sound/horse.mp3"); // 파일 경로에 맞게 수정
+const ribbonSound = new Audio("./horse.mp3"); // 파일 경로에 맞게 수정
 ribbonSound.preload = "auto";
 
 function playRibbonSound() {
