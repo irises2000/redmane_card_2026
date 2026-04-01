@@ -25,7 +25,7 @@ const TEXT_WEIGHT = "150";
 const TEXT_SIZE_RATIO = 0.01;
 const TEXT_START_OFFSET = 40;
 
-const CORNER_TEXT = "Red Manes for 2026";
+const CORNER_TEXT = "";
 const CORNER_TEXT_COLOR = "rgba(255, 168, 168, 0.9)";
 const CORNER_TEXT_FONT_FAMILY = '"Times New Roman", serif';
 const CORNER_TEXT_WEIGHT = "400";
