@@ -789,7 +789,7 @@ function drawSpine() {
 ========================= */
 function createRibbon(x, y) {
   const id = `${Date.now()}-${Math.random()}`;
-  const MAX_BIND_COUNT = 20;
+  const MAX_BIND_COUNT = 10;
   const candidateBindings = [];
 
   manes.forEach((mane) => {
