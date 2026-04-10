@@ -43,6 +43,13 @@ const LETTER_TEXT_START_OFFSET = 40;
 const LETTER_KO_OFFSET_SCALE = 0.68;
 const LETTER_ENG_OFFSET_SCALE = 0.42;
 
+const CORNER_TEXT = "";
+const CORNER_TEXT_COLOR = "rgba(255, 168, 168, 0.9)";
+const CORNER_TEXT_FONT_FAMILY = '"Times New Roman", serif';
+const CORNER_TEXT_WEIGHT = "400";
+const CORNER_TEXT_SIZE = 18;
+const CORNER_TEXT_LEFT = 24;
+const CORNER_TEXT_BOTTOM = 24;
 /* =========================
    3) 구글 시트 CSV 주소
 ========================= */
@@ -77,6 +84,22 @@ function playRibbonSound() {
   }
 }
 
+/* =========================
+   4-1) 사운드 설정
+========================= */
+const ribbonSound = new Audio("./horse.mp3"); // 파일 경로에 맞게 수정
+ribbonSound.preload = "auto";
+
+function playRibbonSound() {
+  try {
+    ribbonSound.currentTime = 0;
+    ribbonSound.play().catch((err) => {
+      console.warn("Sound play failed:", err);
+    });
+  } catch (err) {
+    console.warn("Sound error:", err);
+  }
+}
 /* =========================
    5) 클릭 / 드래그 판정
 ========================= */
@@ -392,15 +415,9 @@ class ManeStrand {
 
     this.bindings = [];
 
-    const t = index / Math.max(total - 1, 1);
-
-    const hue = 0;
-    const saturation = 90 - t * 80;
-    const lightness = 52 + t * 38;
-    const rootLightness = 70 + t * 24;
-
-    this.color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-    this.rootColor = `hsl(${hue}, ${Math.max(saturation - 10, 5)}%, ${rootLightness}%)`;
+    const hue = 0 + (index / total) * 30;
+    this.color = `hsl(${hue}, 85%, 55%)`;
+    this.rootColor = `hsl(${hue}, 95%, 72%)`;
 
     for (let i = 0; i <= this.segments; i++) {
       const px = x + i * this.segmentLength * this.dirX;
@@ -750,6 +767,22 @@ function drawCornerText() {
   ctx.restore();
 }
 
+function drawCornerText() {
+  ctx.save();
+
+  ctx.font = `${CORNER_TEXT_WEIGHT} ${CORNER_TEXT_SIZE}px ${CORNER_TEXT_FONT_FAMILY}`;
+  ctx.fillStyle = CORNER_TEXT_COLOR;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "bottom";
+
+  ctx.fillText(
+    CORNER_TEXT,
+    CORNER_TEXT_LEFT,
+    canvas.height - CORNER_TEXT_BOTTOM,
+  );
+
+  ctx.restore();
+}
 /* =========================
    14) spine 라인
 ========================= */
@@ -833,8 +866,6 @@ function createRibbon(x, y) {
   selectedBindings.forEach(({ mane, segmentIndex }) => {
     mane.bindToRibbon(id, segmentIndex);
   });
-
-  playRibbonSound();
 }
 
 function removeRibbon(ribbonId) {
@@ -1038,8 +1069,7 @@ function animate() {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawSelectedLetterOnSpine();
-  drawCornerText();
+  drawTextOnSpine();
 
   manes.forEach((mane) => {
     mane.update(mouseX, mouseY, mouseDown);
