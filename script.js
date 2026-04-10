@@ -18,21 +18,36 @@ const MANE_ROOT_JITTER = 3;
 /* =========================
    2) 텍스트 설정
 ========================= */
-let GREETING_TEXT = "";
-const TEXT_COLOR = "rgba(255, 168, 168, 0.9)";
-const TEXT_FONT_FAMILY = '"MyLocalFont", serif';
-const TEXT_WEIGHT = "150";
-const TEXT_SIZE_RATIO = 0.01;
-const TEXT_START_OFFSET = 40;
+const CORNER_TEXT = "";
+const CORNER_TEXT_COLOR = "rgba(255, 168, 168, 0.9)";
+const CORNER_TEXT_FONT_FAMILY = '"Times New Roman", serif';
+const CORNER_TEXT_WEIGHT = "400";
+const CORNER_TEXT_SIZE = 18;
+const CORNER_TEXT_LEFT = 24;
+const CORNER_TEXT_BOTTOM = 24;
+
+const LETTER_TEXT_COLOR = "rgba(255, 168, 168, 0.95)";
+const LETTER_ENG_TEXT_COLOR = "rgba(255, 168, 168, 0.72)";
+const LETTER_TEXT_FONT_FAMILY = '"MyLocalFont", serif';
+const LETTER_ENG_FONT_FAMILY = '"MyEnglishFont", serif';
+
+const LETTER_TEXT_WEIGHT = "150";
+const LETTER_ENG_TEXT_WEIGHT = "500";
+
+const LETTER_TEXT_SIZE_RATIO = 0.01;
+const LETTER_ENG_TEXT_SIZE_RATIO = 0.0065;
+
+const LETTER_TEXT_START_OFFSET = 40;
+
+// spine에서 얼마나 떨어질지
+const LETTER_KO_OFFSET_SCALE = 0.68;
+const LETTER_ENG_OFFSET_SCALE = 0.42;
 
 /* =========================
-   3) 구글 시트 CSV 주소 / 쓰기 주소
+   3) 구글 시트 CSV 주소
 ========================= */
 const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRKi5g-6wPn9FoAMVi82Exy8t1sluR2jNqjXgtB4eCB1U6ncqyl69d60CWrd10e4F_2eW2v7Gl9Jubs/pub?gid=0&single=true&output=csv";
-
-const SHEET_WRITE_URL =
-  "https://script.google.com/macros/s/AKfycbz22r6ASublThTUX5_0DW6uXt3BI6Jmt-9VXJEmipJOSeswsfswD8Ji9Zegz02QvSZAPg/exec";
 
 /* =========================
    4) 구슬/묶임 설정
@@ -44,6 +59,23 @@ const RIBBON_DAMPING = 0.72;
 const RIBBON_SIZE = 10;
 const RIBBON_SNAP_STRENGTH = 0.97;
 const BEAD_RADIUS = 8;
+
+/* =========================
+   4-1) 사운드 설정
+========================= */
+const ribbonSound = new Audio("./horse.mp3");
+ribbonSound.preload = "auto";
+
+function playRibbonSound() {
+  try {
+    ribbonSound.currentTime = 0;
+    ribbonSound.play().catch((err) => {
+      console.warn("Sound play failed:", err);
+    });
+  } catch (err) {
+    console.warn("Sound error:", err);
+  }
+}
 
 /* =========================
    5) 클릭 / 드래그 판정
@@ -65,6 +97,7 @@ const POINTER_FORCE_MULTIPLIER = 20;
 let manes = [];
 let ribbons = [];
 let sheetRows = [];
+let selectedLetterRow = null;
 
 let mouseX = 0;
 let mouseY = 0;
@@ -147,10 +180,6 @@ function cleanCell(value) {
     .trim();
 }
 
-function normalizeName(value) {
-  return cleanCell(value).normalize("NFC").replace(/\s+/g, "").toLowerCase();
-}
-
 function parseCSVLine(line) {
   const result = [];
   let current = "";
@@ -193,243 +222,48 @@ async function loadSheetRows() {
 
     if (rows.length < 2) {
       sheetRows = [];
+      selectedLetterRow = null;
       return;
     }
 
     const header = rows[0].map((v) => cleanCell(v).toLowerCase());
-    const nameIndex = header.indexOf("name");
     const letterIndex = header.indexOf("letter");
+    const engIndex = header.indexOf("eng");
 
-    if (nameIndex === -1 || letterIndex === -1) {
-      console.warn("CSV header must include 'name' and 'letter'");
+    if (letterIndex === -1) {
+      console.warn("CSV header must include 'letter'");
       console.log("Detected header:", header);
       sheetRows = [];
+      selectedLetterRow = null;
       return;
     }
 
     sheetRows = rows
       .slice(1)
       .map((row) => ({
-        name: cleanCell(row[nameIndex]),
         letter: cleanCell(row[letterIndex]),
+        eng: engIndex !== -1 ? cleanCell(row[engIndex]) : "",
       }))
-      .filter((row) => row.name);
+      .filter((row) => row.letter);
+
+    if (sheetRows.length > 0) {
+      const randomIndex = Math.floor(Math.random() * sheetRows.length);
+      selectedLetterRow = sheetRows[randomIndex];
+    } else {
+      selectedLetterRow = null;
+    }
 
     console.log("Loaded rows:", sheetRows);
+    console.log("Selected row:", selectedLetterRow);
   } catch (err) {
     console.error("Failed to load sheet rows:", err);
     sheetRows = [];
-  }
-}
-
-function findLetterRowByName(inputName) {
-  const normalizedInput = normalizeName(inputName);
-  return sheetRows.find((row) => normalizeName(row.name) === normalizedInput);
-}
-
-async function addNameToSheet(name) {
-  try {
-    if (!SHEET_WRITE_URL) {
-      return {
-        success: false,
-        message: "SHEET_WRITE_URL이 비어 있어요.",
-      };
-    }
-
-    const formData = new FormData();
-    formData.append("name", name);
-
-    const res = await fetch(SHEET_WRITE_URL, {
-      method: "POST",
-      body: formData,
-    });
-
-    const text = await res.text();
-    console.log("Apps Script raw response:", text);
-
-    try {
-      return JSON.parse(text);
-    } catch {
-      return {
-        success: false,
-        message: "응답이 JSON 형식이 아니에요.",
-        raw: text,
-      };
-    }
-  } catch (err) {
-    console.error("Failed to add name to sheet:", err);
-    return {
-      success: false,
-      message: "시트에 이름을 추가하지 못했어요.",
-    };
+    selectedLetterRow = null;
   }
 }
 
 /* =========================
-   11) 이름 입력 모달
-========================= */
-function createNameModal() {
-  const overlay = document.createElement("div");
-  overlay.className = "name-modal-overlay";
-
-  const modal = document.createElement("div");
-  modal.className = "name-modal";
-
-  const title = document.createElement("div");
-  title.className = "name-modal__title";
-  title.textContent = "";
-
-  const desc = document.createElement("div");
-  desc.className = "name-modal__desc";
-  desc.textContent = "";
-
-  const input = document.createElement("input");
-  input.className = "name-modal__input";
-  input.type = "text";
-  input.placeholder = "수취인은 누구신지요";
-  input.autocomplete = "off";
-
-  const message = document.createElement("div");
-  message.className = "name-modal__message";
-
-  const buttonWrap = document.createElement("div");
-  buttonWrap.className = "name-modal__buttons";
-
-  const cancelBtn = document.createElement("button");
-  cancelBtn.className = "name-modal__button name-modal__button--cancel";
-  cancelBtn.textContent = "닫기";
-
-  const submitBtn = document.createElement("button");
-  submitBtn.className = "name-modal__button name-modal__button--submit";
-  submitBtn.textContent = "확인";
-
-  buttonWrap.appendChild(cancelBtn);
-  buttonWrap.appendChild(submitBtn);
-
-  modal.appendChild(title);
-  modal.appendChild(desc);
-  modal.appendChild(input);
-  modal.appendChild(message);
-  modal.appendChild(buttonWrap);
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
-
-  function closeModal() {
-    overlay.remove();
-  }
-
-  function showResultModal(text) {
-    const resultOverlay = document.createElement("div");
-    resultOverlay.className = "name-modal-overlay";
-
-    const resultModal = document.createElement("div");
-    resultModal.className = "name-modal";
-
-    const resultDesc = document.createElement("div");
-    resultDesc.className = "name-modal__desc";
-    resultDesc.textContent = text;
-
-    const resultButtonWrap = document.createElement("div");
-    resultButtonWrap.className = "name-modal__buttons";
-
-    const resultCloseBtn = document.createElement("button");
-    resultCloseBtn.className = "name-modal__button name-modal__button--cancel";
-    resultCloseBtn.textContent = "닫기";
-
-    const resultConfirmBtn = document.createElement("button");
-    resultConfirmBtn.className =
-      "name-modal__button name-modal__button--submit";
-    resultConfirmBtn.textContent = "확인";
-
-    function closeResultModal() {
-      GREETING_TEXT = "";
-      resultOverlay.remove();
-    }
-
-    resultCloseBtn.addEventListener("click", closeResultModal);
-    resultConfirmBtn.addEventListener("click", closeResultModal);
-
-    resultOverlay.addEventListener("click", (e) => {
-      if (e.target === resultOverlay) {
-        closeResultModal();
-      }
-    });
-
-    resultButtonWrap.appendChild(resultCloseBtn);
-    resultButtonWrap.appendChild(resultConfirmBtn);
-
-    resultModal.appendChild(resultDesc);
-    resultModal.appendChild(resultButtonWrap);
-    resultOverlay.appendChild(resultModal);
-    document.body.appendChild(resultOverlay);
-  }
-
-  async function submitName() {
-    const cleanedInput = cleanCell(input.value);
-
-    if (!cleanedInput) {
-      message.textContent = "이름을 입력해주세요.";
-      return;
-    }
-
-    const matchedRow = findLetterRowByName(cleanedInput);
-
-    // 1) name 있고 letter도 있음
-    if (matchedRow && matchedRow.letter) {
-      GREETING_TEXT = `${matchedRow.name}님, ${matchedRow.letter}`;
-      closeModal();
-      return;
-    }
-
-    // 2) name 있고 letter 비어 있음
-    if (matchedRow && !matchedRow.letter) {
-      closeModal();
-      showResultModal("아직 편지를 완성하지 못했습니다");
-      return;
-    }
-
-    // 3) name 없음
-    message.textContent = "이름 추가 중...";
-
-    const result = await addNameToSheet(cleanedInput);
-
-    if (result.success) {
-      sheetRows.push({ name: cleanedInput, letter: "" });
-      closeModal();
-      showResultModal("잠재적 수취인에 추가됨");
-    } else {
-      message.textContent = result.message || "이름 추가에 실패했어요.";
-      console.warn("Name add failed:", result);
-    }
-  }
-
-  submitBtn.addEventListener("click", submitName);
-
-  cancelBtn.addEventListener("click", () => {
-    GREETING_TEXT = "";
-    closeModal();
-  });
-
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") submitName();
-    if (e.key === "Escape") {
-      GREETING_TEXT = "";
-      closeModal();
-    }
-  });
-
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) {
-      GREETING_TEXT = "";
-      closeModal();
-    }
-  });
-
-  setTimeout(() => input.focus(), 0);
-}
-
-/* =========================
-   12) 캔버스 / 갈기 배치
+   11) 캔버스 / 갈기 배치
 ========================= */
 function resizeCanvas() {
   canvas.width = window.innerWidth;
@@ -535,8 +369,7 @@ function initManes() {
 }
 
 /* =========================
-   13) 갈기 한 가닥 클래스
-   - 여기 바람/갈기 로직은 네가 준 코드 그대로 유지
+   12) 갈기 한 가닥 클래스
 ========================= */
 class ManeStrand {
   constructor(x, y, dirX, dirY, index, total) {
@@ -548,7 +381,6 @@ class ManeStrand {
     this.index = index;
     this.segments = MANE_SEGMENTS;
 
-    // 갈기 총 길이 = 화면 가로의 절반
     this.segmentLength = (canvas.width * 0.5) / MANE_SEGMENTS;
 
     this.points = [];
@@ -560,9 +392,15 @@ class ManeStrand {
 
     this.bindings = [];
 
-    const hue = 0 + (index / total) * 30;
-    this.color = `hsl(${hue}, 85%, 55%)`;
-    this.rootColor = `hsl(${hue}, 95%, 72%)`;
+    const t = index / Math.max(total - 1, 1);
+
+    const hue = 0;
+    const saturation = 90 - t * 80;
+    const lightness = 52 + t * 38;
+    const rootLightness = 70 + t * 24;
+
+    this.color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    this.rootColor = `hsl(${hue}, ${Math.max(saturation - 10, 5)}%, ${rootLightness}%)`;
 
     for (let i = 0; i <= this.segments; i++) {
       const px = x + i * this.segmentLength * this.dirX;
@@ -738,7 +576,6 @@ class ManeStrand {
     ctx.lineTo(last.x, last.y);
 
     ctx.strokeStyle = this.color;
-
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
     ctx.shadowBlur = 8;
@@ -750,22 +587,34 @@ class ManeStrand {
 }
 
 /* =========================
-   14) 텍스트 그리기
+   13) spine 텍스트 그리기
 ========================= */
-function getTextFontSize() {
-  return Math.max(18, canvas.width * TEXT_SIZE_RATIO);
+function getLetterFontSize() {
+  return Math.max(18, canvas.width * LETTER_TEXT_SIZE_RATIO);
 }
 
-function setTextStyle() {
-  const fontSize = getTextFontSize();
-  ctx.font = `${TEXT_WEIGHT} ${fontSize}px ${TEXT_FONT_FAMILY}`;
-  ctx.fillStyle = TEXT_COLOR;
+function getEngFontSize() {
+  return Math.max(13, canvas.width * LETTER_ENG_TEXT_SIZE_RATIO);
+}
+
+function setSpineTextStyle(type = "ko") {
+  if (type === "eng") {
+    const fontSize = getEngFontSize();
+    ctx.font = `${LETTER_ENG_TEXT_WEIGHT} ${fontSize}px ${LETTER_ENG_FONT_FAMILY}`;
+    ctx.fillStyle = LETTER_ENG_TEXT_COLOR;
+  } else {
+    const fontSize = getLetterFontSize();
+    ctx.font = `${LETTER_TEXT_WEIGHT} ${fontSize}px ${LETTER_TEXT_FONT_FAMILY}`;
+    ctx.fillStyle = LETTER_TEXT_COLOR;
+  }
+
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 }
 
-function measureTextSequence(text) {
-  setTextStyle();
+function measureTextSequence(text, type = "ko") {
+  setSpineTextStyle(type);
+
   const widths = [];
   let total = 0;
 
@@ -810,41 +659,99 @@ function getPointOnSpine(distance) {
   };
 }
 
-function drawTextOnSpine() {
+function drawStackedTextSequenceOnSpine(koText, engText, startDistance) {
   const layout = getLayoutValues();
-  setTextStyle();
 
-  const text = GREETING_TEXT;
-  const { widths, total } = measureTextSequence(text);
+  const ko = koText || "";
+  const eng = engText || "";
 
-  if (total <= 0) return;
+  if (!ko && !eng) return startDistance;
 
-  const textOffset = layout.thickManeLength * 0.5;
-  let cursor = TEXT_START_OFFSET;
+  const koMeasure = measureTextSequence(ko, "ko");
+  const engMeasure = measureTextSequence(eng, "eng");
 
-  for (let i = 0; i < text.length; i++) {
-    const charWidth = widths[i];
-    const charCenter = cursor + charWidth / 2;
+  const maxLength = Math.max(ko.length, eng.length);
+  const koWidths = koMeasure.widths;
+  const engWidths = engMeasure.widths;
+
+  let cursor = startDistance;
+
+  for (let i = 0; i < maxLength; i++) {
+    const koChar = ko[i] || "";
+    const engChar = eng[i] || "";
+
+    const koWidth = koChar ? koWidths[i] || 0 : 0;
+    const engWidth = engChar ? engWidths[i] || 0 : 0;
+
+    const stepWidth = Math.max(koWidth, engWidth, 6);
+    const charCenter = cursor + stepWidth / 2;
 
     if (charCenter >= layout.totalLen) break;
 
     const p = getPointOnSpine(charCenter);
 
-    const drawX = p.x + p.normalX * textOffset;
-    const drawY = p.y + p.normalY * textOffset;
+    if (koChar) {
+      const koX =
+        p.x + p.normalX * (layout.thickManeLength * LETTER_KO_OFFSET_SCALE);
+      const koY =
+        p.y + p.normalY * (layout.thickManeLength * LETTER_KO_OFFSET_SCALE);
 
-    ctx.save();
-    ctx.translate(drawX, drawY);
-    ctx.rotate(p.tangentAngle);
-    ctx.fillText(text[i], 0, 0);
-    ctx.restore();
+      setSpineTextStyle("ko");
+      ctx.save();
+      ctx.translate(koX, koY);
+      ctx.rotate(p.tangentAngle);
+      ctx.fillText(koChar, 0, 0);
+      ctx.restore();
+    }
 
-    cursor += charWidth;
+    if (engChar) {
+      const engX =
+        p.x + p.normalX * (layout.thickManeLength * LETTER_ENG_OFFSET_SCALE);
+      const engY =
+        p.y + p.normalY * (layout.thickManeLength * LETTER_ENG_OFFSET_SCALE);
+
+      setSpineTextStyle("eng");
+      ctx.save();
+      ctx.translate(engX, engY);
+      ctx.rotate(p.tangentAngle);
+      ctx.fillText(engChar, 0, 0);
+      ctx.restore();
+    }
+
+    cursor += stepWidth;
   }
+
+  return cursor;
+}
+
+function drawSelectedLetterOnSpine() {
+  if (!selectedLetterRow) return;
+
+  const letterText = selectedLetterRow.letter || "";
+  const engText = selectedLetterRow.eng || "";
+
+  drawStackedTextSequenceOnSpine(letterText, engText, LETTER_TEXT_START_OFFSET);
+}
+
+function drawCornerText() {
+  ctx.save();
+
+  ctx.font = `${CORNER_TEXT_WEIGHT} ${CORNER_TEXT_SIZE}px ${CORNER_TEXT_FONT_FAMILY}`;
+  ctx.fillStyle = CORNER_TEXT_COLOR;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "bottom";
+
+  ctx.fillText(
+    CORNER_TEXT,
+    CORNER_TEXT_LEFT,
+    canvas.height - CORNER_TEXT_BOTTOM,
+  );
+
+  ctx.restore();
 }
 
 /* =========================
-   15) spine 라인
+   14) spine 라인
 ========================= */
 function drawSpine() {
   const layout = getLayoutValues();
@@ -877,7 +784,7 @@ function drawSpine() {
 }
 
 /* =========================
-   16) 구슬 생성 / 제거 / 탐색
+   15) 구슬 생성 / 제거 / 탐색
 ========================= */
 function createRibbon(x, y) {
   const id = `${Date.now()}-${Math.random()}`;
@@ -926,6 +833,8 @@ function createRibbon(x, y) {
   selectedBindings.forEach(({ mane, segmentIndex }) => {
     mane.bindToRibbon(id, segmentIndex);
   });
+
+  playRibbonSound();
 }
 
 function removeRibbon(ribbonId) {
@@ -955,7 +864,7 @@ function findRibbonAtPoint(x, y) {
 }
 
 /* =========================
-   17) 구슬 렌더링
+   16) 구슬 렌더링
 ========================= */
 function drawRibbon(ribbon) {
   ctx.save();
@@ -1001,7 +910,7 @@ function handleBindTap(x, y) {
 }
 
 /* =========================
-   18) 포인터 입력 처리
+   17) 포인터 입력 처리
 ========================= */
 function beginPointer(x, y) {
   mouseX = x;
@@ -1060,7 +969,7 @@ function endPointer(x, y, isTouch = false) {
 }
 
 /* =========================
-   19) 이벤트 등록
+   18) 이벤트 등록
 ========================= */
 canvas.addEventListener("mousemove", (e) => {
   const rect = canvas.getBoundingClientRect();
@@ -1123,13 +1032,14 @@ canvas.addEventListener("touchend", () => {
 });
 
 /* =========================
-   20) 렌더 루프
+   19) 렌더 루프
 ========================= */
 function animate() {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawTextOnSpine();
+  drawSelectedLetterOnSpine();
+  drawCornerText();
 
   manes.forEach((mane) => {
     mane.update(mouseX, mouseY, mouseDown);
@@ -1143,20 +1053,20 @@ function animate() {
 }
 
 /* =========================
-   21) 시작
+   20) 시작
 ========================= */
 async function init() {
   resizeCanvas();
   window.addEventListener("resize", resizeCanvas);
 
   await document.fonts.load('16px "MyLocalFont"');
+  await document.fonts.load('16px "MyEnglishFont"');
   await document.fonts.ready;
 
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   await loadSheetRows();
-  createNameModal();
   animate();
 }
 

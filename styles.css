@@ -11,6 +11,13 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: "MyEnglishFont";
+  src: url("./fonts/Biro_Script_reduced.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
 body {
   margin: 0;
 }
