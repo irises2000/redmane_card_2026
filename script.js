@@ -45,11 +45,11 @@ const LETTER_KO_OFFSET_SCALE = 0.68;
 const LETTER_ENG_OFFSET_SCALE = 0.42;
 
 // 호 구간 자간 압축
-const ARC_KO_TEXT_SPACING_SCALE = 0.8;
-const ARC_ENG_TEXT_SPACING_SCALE = 0.5;
+const ARC_KO_TEXT_SPACING_SCALE = 0.78;
+const ARC_ENG_TEXT_SPACING_SCALE = 0.72;
+const VERTICAL_KO_TEXT_SPACING_SCALE = 1.0;
+const VERTICAL_ENG_TEXT_SPACING_SCALE = 1.0;
 
-const VERTICAL_KO_TEXT_SPACING_SCALE = 1.3;
-const VERTICAL_ENG_TEXT_SPACING_SCALE = 1.5;
 /* =========================
    3) 구글 시트 CSV 주소
 ========================= */
@@ -424,6 +424,10 @@ class ManeStrand {
     }
   }
 
+  hasAnyBinding() {
+    return this.bindings.length > 0;
+  }
+
   getBindings() {
     return this.bindings
       .map((binding) => {
@@ -442,6 +446,8 @@ class ManeStrand {
   }
 
   bindToRibbon(ribbonId, segmentIndex) {
+    // 갈기 한 가닥은 리본 하나에만 묶일 수 있음
+    if (this.hasAnyBinding()) return false;
     if (this.isSegmentBound(segmentIndex)) return false;
 
     this.bindings.push({
@@ -585,7 +591,7 @@ class ManeStrand {
     ctx.strokeStyle = this.color;
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
-    ctx.shadowBlur = 7;
+    ctx.shadowBlur = 8;
     ctx.shadowColor = this.rootColor;
     ctx.stroke();
 
@@ -809,16 +815,17 @@ function drawSpine() {
 ========================= */
 function createRibbon(x, y) {
   const id = `${Date.now()}-${Math.random()}`;
-  const MAX_BIND_COUNT = 10;
+  const MAX_BIND_COUNT = 20;
   const candidateBindings = [];
 
   manes.forEach((mane) => {
+    // 이미 어떤 리본에라도 잡혀 있는 갈기는 제외
+    if (mane.hasAnyBinding()) return;
+
     let bestIndex = -1;
     let bestDist = Infinity;
 
     for (let i = 1; i < mane.points.length; i++) {
-      if (mane.isSegmentBound(i)) continue;
-
       const dx = x - mane.points[i].x;
       const dy = y - mane.points[i].y;
       const dist = Math.hypot(dx, dy);
