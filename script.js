@@ -44,6 +44,12 @@ const LETTER_TEXT_START_OFFSET = 40;
 const LETTER_KO_OFFSET_SCALE = 0.68;
 const LETTER_ENG_OFFSET_SCALE = 0.42;
 
+// 호 구간 자간 압축
+const ARC_KO_TEXT_SPACING_SCALE = 0.8;
+const ARC_ENG_TEXT_SPACING_SCALE = 0.5;
+
+const VERTICAL_KO_TEXT_SPACING_SCALE = 1.3;
+const VERTICAL_ENG_TEXT_SPACING_SCALE = 1.5;
 /* =========================
    3) 구글 시트 CSV 주소
 ========================= */
@@ -681,8 +687,22 @@ function drawStackedTextSequenceOnSpine(koText, engText, startDistance) {
     const koChar = ko[i] || "";
     const engChar = eng[i] || "";
 
-    const koWidth = koChar ? koWidths[i] || 0 : 0;
-    const engWidth = engChar ? engWidths[i] || 0 : 0;
+    const koWidthRaw = koChar ? koWidths[i] || 0 : 0;
+    const engWidthRaw = engChar ? engWidths[i] || 0 : 0;
+
+    const probeDistance = cursor + Math.max(koWidthRaw, engWidthRaw, 6) / 2;
+    const isArc = probeDistance <= layout.arcLen;
+
+    const koSpacingScale = isArc
+      ? ARC_KO_TEXT_SPACING_SCALE
+      : VERTICAL_KO_TEXT_SPACING_SCALE;
+
+    const engSpacingScale = isArc
+      ? ARC_ENG_TEXT_SPACING_SCALE
+      : VERTICAL_ENG_TEXT_SPACING_SCALE;
+
+    const koWidth = koWidthRaw * koSpacingScale;
+    const engWidth = engWidthRaw * engSpacingScale;
 
     const stepWidth = Math.max(koWidth, engWidth, 6);
     const charCenter = cursor + stepWidth / 2;
