@@ -29,19 +29,17 @@ const CORNER_TEXT_BOTTOM = 24;
 const LETTER_TEXT_COLOR = "rgba(255, 168, 168, 0.95)";
 const LETTER_ENG_TEXT_COLOR = "rgba(255, 168, 168, 0.72)";
 const LETTER_TEXT_FONT_FAMILY = '"MyLocalFont", serif';
-const LETTER_ENG_FONT_FAMILY = '"MyEnglishFont", serif';
+const LETTER_ENG_FONT_FAMILY = '"Times New Roman", serif';
 
 const LETTER_TEXT_WEIGHT = "150";
-const LETTER_ENG_TEXT_WEIGHT = "500";
+const LETTER_ENG_TEXT_WEIGHT = "400";
 
 const LETTER_TEXT_SIZE_RATIO = 0.01;
 const LETTER_ENG_TEXT_SIZE_RATIO = 0.0065;
 
 const LETTER_TEXT_START_OFFSET = 40;
+const LETTER_ENG_GAP = 48;
 
-// spine에서 얼마나 떨어질지
-const LETTER_KO_OFFSET_SCALE = 0.68;
-const LETTER_ENG_OFFSET_SCALE = 0.42;
 /* =========================
    3) 구글 시트 CSV 주소
 ========================= */
@@ -76,22 +74,6 @@ function playRibbonSound() {
   }
 }
 
-/* =========================
-   4-1) 사운드 설정
-========================= */
-const ribbonSound = new Audio("./horse.mp3"); // 파일 경로에 맞게 수정
-ribbonSound.preload = "auto";
-
-function playRibbonSound() {
-  try {
-    ribbonSound.currentTime = 0;
-    ribbonSound.play().catch((err) => {
-      console.warn("Sound play failed:", err);
-    });
-  } catch (err) {
-    console.warn("Sound error:", err);
-  }
-}
 /* =========================
    5) 클릭 / 드래그 판정
 ========================= */
@@ -407,9 +389,15 @@ class ManeStrand {
 
     this.bindings = [];
 
-    const hue = 0 + (index / total) * 30;
-    this.color = `hsl(${hue}, 85%, 55%)`;
-    this.rootColor = `hsl(${hue}, 95%, 72%)`;
+    const t = index / Math.max(total - 1, 1);
+
+    const hue = 0;
+    const saturation = 90 - t * 80;
+    const lightness = 52 + t * 38;
+    const rootLightness = 70 + t * 24;
+
+    this.color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    this.rootColor = `hsl(${hue}, ${Math.max(saturation - 10, 5)}%, ${rootLightness}%)`;
 
     for (let i = 0; i <= this.segments; i++) {
       const px = x + i * this.segmentLength * this.dirX;
@@ -668,66 +656,41 @@ function getPointOnSpine(distance) {
   };
 }
 
-function drawStackedTextSequenceOnSpine(koText, engText, startDistance) {
+function drawTextSequenceOnSpine(
+  text,
+  startDistance,
+  type = "ko",
+  offsetScale = 0.5,
+) {
+  if (!text) return startDistance;
+
   const layout = getLayoutValues();
+  setSpineTextStyle(type);
 
-  const ko = koText || "";
-  const eng = engText || "";
+  const { widths, total } = measureTextSequence(text, type);
+  if (total <= 0) return startDistance;
 
-  if (!ko && !eng) return startDistance;
-
-  const koMeasure = measureTextSequence(ko, "ko");
-  const engMeasure = measureTextSequence(eng, "eng");
-
-  const maxLength = Math.max(ko.length, eng.length);
-  const koWidths = koMeasure.widths;
-  const engWidths = engMeasure.widths;
-
+  const textOffset = layout.thickManeLength * offsetScale;
   let cursor = startDistance;
 
-  for (let i = 0; i < maxLength; i++) {
-    const koChar = ko[i] || "";
-    const engChar = eng[i] || "";
-
-    const koWidth = koChar ? koWidths[i] || 0 : 0;
-    const engWidth = engChar ? engWidths[i] || 0 : 0;
-
-    const stepWidth = Math.max(koWidth, engWidth, 6);
-    const charCenter = cursor + stepWidth / 2;
+  for (let i = 0; i < text.length; i++) {
+    const charWidth = widths[i];
+    const charCenter = cursor + charWidth / 2;
 
     if (charCenter >= layout.totalLen) break;
 
     const p = getPointOnSpine(charCenter);
 
-    if (koChar) {
-      const koX =
-        p.x + p.normalX * (layout.thickManeLength * LETTER_KO_OFFSET_SCALE);
-      const koY =
-        p.y + p.normalY * (layout.thickManeLength * LETTER_KO_OFFSET_SCALE);
+    const drawX = p.x + p.normalX * textOffset;
+    const drawY = p.y + p.normalY * textOffset;
 
-      setSpineTextStyle("ko");
-      ctx.save();
-      ctx.translate(koX, koY);
-      ctx.rotate(p.tangentAngle);
-      ctx.fillText(koChar, 0, 0);
-      ctx.restore();
-    }
+    ctx.save();
+    ctx.translate(drawX, drawY);
+    ctx.rotate(p.tangentAngle);
+    ctx.fillText(text[i], 0, 0);
+    ctx.restore();
 
-    if (engChar) {
-      const engX =
-        p.x + p.normalX * (layout.thickManeLength * LETTER_ENG_OFFSET_SCALE);
-      const engY =
-        p.y + p.normalY * (layout.thickManeLength * LETTER_ENG_OFFSET_SCALE);
-
-      setSpineTextStyle("eng");
-      ctx.save();
-      ctx.translate(engX, engY);
-      ctx.rotate(p.tangentAngle);
-      ctx.fillText(engChar, 0, 0);
-      ctx.restore();
-    }
-
-    cursor += stepWidth;
+    cursor += charWidth;
   }
 
   return cursor;
@@ -739,7 +702,14 @@ function drawSelectedLetterOnSpine() {
   const letterText = selectedLetterRow.letter || "";
   const engText = selectedLetterRow.eng || "";
 
-  drawStackedTextSequenceOnSpine(letterText, engText, LETTER_TEXT_START_OFFSET);
+  let cursor = LETTER_TEXT_START_OFFSET;
+
+  cursor = drawTextSequenceOnSpine(letterText, cursor, "ko", 0.5);
+
+  if (engText) {
+    cursor += LETTER_ENG_GAP;
+    drawTextSequenceOnSpine(engText, cursor, "eng", 0.72);
+  }
 }
 
 function drawCornerText() {
@@ -759,22 +729,6 @@ function drawCornerText() {
   ctx.restore();
 }
 
-function drawCornerText() {
-  ctx.save();
-
-  ctx.font = `${CORNER_TEXT_WEIGHT} ${CORNER_TEXT_SIZE}px ${CORNER_TEXT_FONT_FAMILY}`;
-  ctx.fillStyle = CORNER_TEXT_COLOR;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "bottom";
-
-  ctx.fillText(
-    CORNER_TEXT,
-    CORNER_TEXT_LEFT,
-    canvas.height - CORNER_TEXT_BOTTOM,
-  );
-
-  ctx.restore();
-}
 /* =========================
    14) spine 라인
 ========================= */
@@ -858,6 +812,8 @@ function createRibbon(x, y) {
   selectedBindings.forEach(({ mane, segmentIndex }) => {
     mane.bindToRibbon(id, segmentIndex);
   });
+
+  playRibbonSound();
 }
 
 function removeRibbon(ribbonId) {
@@ -1061,7 +1017,8 @@ function animate() {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawTextOnSpine();
+  drawSelectedLetterOnSpine();
+  drawCornerText();
 
   manes.forEach((mane) => {
     mane.update(mouseX, mouseY, mouseDown);
@@ -1082,7 +1039,6 @@ async function init() {
   window.addEventListener("resize", resizeCanvas);
 
   await document.fonts.load('16px "MyLocalFont"');
-  await document.fonts.load('16px "MyEnglishFont"');
   await document.fonts.ready;
 
   ctx.fillStyle = BG_COLOR;
