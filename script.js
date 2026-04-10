@@ -42,14 +42,6 @@ const LETTER_TEXT_START_OFFSET = 40;
 // spine에서 얼마나 떨어질지
 const LETTER_KO_OFFSET_SCALE = 0.68;
 const LETTER_ENG_OFFSET_SCALE = 0.42;
-
-const CORNER_TEXT = "";
-const CORNER_TEXT_COLOR = "rgba(255, 168, 168, 0.9)";
-const CORNER_TEXT_FONT_FAMILY = '"Times New Roman", serif';
-const CORNER_TEXT_WEIGHT = "400";
-const CORNER_TEXT_SIZE = 18;
-const CORNER_TEXT_LEFT = 24;
-const CORNER_TEXT_BOTTOM = 24;
 /* =========================
    3) 구글 시트 CSV 주소
 ========================= */
