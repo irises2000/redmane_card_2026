@@ -5,10 +5,9 @@ if (!canvas) {
 const ctx = canvas.getContext("2d");
 
 /* =========================
-   1) 기본 비주얼 설정
+   기본 설정
 ========================= */
 const BG_COLOR = "#c41e3a";
-const SPINE_COLOR = "#c41e3a";
 
 const MANE_SEGMENTS = 10;
 const MANE_LENGTH_RATIO = 15;
@@ -16,7 +15,7 @@ const THICK_PORTION = 0.6;
 const MANE_ROOT_JITTER = 3;
 
 /* =========================
-   2) 텍스트 설정
+   텍스트 설정
 ========================= */
 const CORNER_TEXT = "";
 const CORNER_TEXT_COLOR = "rgba(255, 168, 168, 0.9)";
@@ -34,41 +33,35 @@ const LETTER_ENG_FONT_FAMILY = '"MyEnglishFont", serif';
 const LETTER_TEXT_WEIGHT = "150";
 const LETTER_ENG_TEXT_WEIGHT = "400";
 
-/* 여기 키우면 됨 */
 const LETTER_TEXT_SIZE_RATIO = 0.013;
 const LETTER_ENG_TEXT_SIZE_RATIO = 0.008;
-
 const LETTER_TEXT_START_OFFSET = 40;
 
-// spine 기준 위아래 두 줄 거리
 const LETTER_KO_OFFSET_SCALE = 0.68;
 const LETTER_ENG_OFFSET_SCALE = 0.42;
 
-// 호 구간 자간 압축
-const ARC_KO_TEXT_SPACING_SCALE = 0.78;
-const ARC_ENG_TEXT_SPACING_SCALE = 0.72;
-const VERTICAL_KO_TEXT_SPACING_SCALE = 1.0;
-const VERTICAL_ENG_TEXT_SPACING_SCALE = 1.0;
+const ARC_KO_TEXT_SPACING_SCALE = 0.8;
+const ARC_ENG_TEXT_SPACING_SCALE = 0.5;
+const VERTICAL_KO_TEXT_SPACING_SCALE = 1.3;
+const VERTICAL_ENG_TEXT_SPACING_SCALE = 1.5;
 
 /* =========================
-   3) 구글 시트 CSV 주소
+   구글 시트 CSV 주소
 ========================= */
 const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRKi5g-6wPn9FoAMVi82Exy8t1sluR2jNqjXgtB4eCB1U6ncqyl69d60CWrd10e4F_2eW2v7Gl9Jubs/pub?gid=0&single=true&output=csv";
 
 /* =========================
-   4) 구슬/묶임 설정
+   리본 / 구슬 설정
 ========================= */
 const RIBBON_CAPTURE_RADIUS = 30;
 const RIBBON_TOGGLE_RADIUS = 12;
-const RIBBON_BIND_STRENGTH = 0.5;
-const RIBBON_DAMPING = 0.72;
-const RIBBON_SIZE = 10;
 const RIBBON_SNAP_STRENGTH = 0.97;
 const BEAD_RADIUS = 8;
+const MAX_BIND_COUNT = 10;
 
 /* =========================
-   4-1) 사운드 설정
+   사운드 설정
 ========================= */
 const ribbonSound = new Audio("./horse.mp3");
 ribbonSound.preload = "auto";
@@ -85,7 +78,7 @@ function playRibbonSound() {
 }
 
 /* =========================
-   5) 클릭 / 드래그 판정
+   클릭 / 드래그 판정
 ========================= */
 const CLICK_MOVE_THRESHOLD = 6;
 const CLICK_TIME_THRESHOLD = 10;
@@ -93,13 +86,13 @@ const TOUCH_TAP_TIME_THRESHOLD = 10;
 const TOUCH_TAP_MOVE_THRESHOLD = 12;
 
 /* =========================
-   6) 마우스 힘
+   포인터 힘
 ========================= */
 const POINTER_INFLUENCE_RADIUS = 70;
 const POINTER_FORCE_MULTIPLIER = 20;
 
 /* =========================
-   7) 전역 상태값
+   전역 상태
 ========================= */
 let manes = [];
 let ribbons = [];
@@ -117,14 +110,8 @@ let pointerCurrentY = 0;
 let pointerDownTime = 0;
 let pointerMoved = false;
 
-let arcCenterX = 0;
-let arcCenterY = 0;
-let arcRadius = 0;
-let arcEndX = 0;
-let arcEndY = 0;
-
 /* =========================
-   8) 랜덤 구슬 색상
+   랜덤 구슬 색상
 ========================= */
 function getRandomRibbonColor() {
   const hue = Math.floor(Math.random() * 360);
@@ -132,9 +119,6 @@ function getRandomRibbonColor() {
   const lightness = 35 + Math.random() * 20;
 
   return {
-    h: hue,
-    s: saturation,
-    l: lightness,
     base: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
     mid: `hsl(${hue}, ${saturation}%, ${Math.min(lightness + 12, 82)}%)`,
     highlight: `hsl(${hue}, ${Math.max(saturation - 10, 30)}%, ${Math.min(
@@ -145,38 +129,7 @@ function getRandomRibbonColor() {
 }
 
 /* =========================
-   9) 색 혼합 유틸
-========================= */
-function colorToRGB(color) {
-  const temp = document.createElement("canvas");
-  const tctx = temp.getContext("2d");
-  tctx.fillStyle = color;
-  const parsed = tctx.fillStyle;
-  const match = parsed.match(/\d+/g);
-
-  if (!match || match.length < 3) {
-    return { r: 0, g: 0, b: 0 };
-  }
-
-  return {
-    r: Number(match[0]),
-    g: Number(match[1]),
-    b: Number(match[2]),
-  };
-}
-
-function mixWithWhite(color, amount = 0.5) {
-  const { r, g, b } = colorToRGB(color);
-
-  const nr = Math.round(r + (255 - r) * amount);
-  const ng = Math.round(g + (255 - g) * amount);
-  const nb = Math.round(b + (255 - b) * amount);
-
-  return `rgb(${nr}, ${ng}, ${nb})`;
-}
-
-/* =========================
-   10) 시트 유틸
+   CSV 유틸
 ========================= */
 function cleanCell(value) {
   return String(value ?? "")
@@ -221,7 +174,6 @@ async function loadSheetRows() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const csv = await res.text();
-
     const rows = csv
       .split(/\r?\n/)
       .filter((line) => line.trim().length > 0)
@@ -259,9 +211,6 @@ async function loadSheetRows() {
     } else {
       selectedLetterRow = null;
     }
-
-    console.log("Loaded rows:", sheetRows);
-    console.log("Selected row:", selectedLetterRow);
   } catch (err) {
     console.error("Failed to load sheet rows:", err);
     sheetRows = [];
@@ -270,7 +219,7 @@ async function loadSheetRows() {
 }
 
 /* =========================
-   11) 캔버스 / 갈기 배치
+   캔버스 / 갈기 배치
 ========================= */
 function resizeCanvas() {
   canvas.width = window.innerWidth;
@@ -280,8 +229,6 @@ function resizeCanvas() {
 
 function getLayoutValues() {
   const segmentLength = canvas.width / MANE_LENGTH_RATIO;
-  const fullManeLength = MANE_SEGMENTS * segmentLength;
-
   const thickLimit = Math.floor((MANE_SEGMENTS + 1) * THICK_PORTION);
   const thickManeLength = thickLimit * segmentLength;
 
@@ -303,14 +250,10 @@ function getLayoutValues() {
   const totalLen = arcLen + vertLen;
 
   return {
-    segmentLength,
-    fullManeLength,
     thickManeLength,
-    thickLimit,
-    verticalRootX,
-    R,
     cx,
     cy,
+    R,
     startAngle,
     endAngle,
     arcLen,
@@ -326,13 +269,6 @@ function initManes() {
 
   const layout = getLayoutValues();
   const spacing = 4;
-
-  arcCenterX = layout.cx;
-  arcCenterY = layout.cy;
-  arcRadius = layout.R;
-  arcEndX = layout.endX;
-  arcEndY = layout.endY;
-
   const maneCount = Math.max(2, Math.floor(layout.totalLen / spacing));
 
   for (let i = 0; i < maneCount; i++) {
@@ -361,9 +297,6 @@ function initManes() {
         layout.vertLen > 0 ? (dist - layout.arcLen) / layout.vertLen : 0;
       x = layout.endX;
       y = layout.endY + u * layout.vertLen;
-
-      dirX = 1;
-      dirY = 0;
     }
 
     const jitterX = (Math.random() - 0.5) * MANE_ROOT_JITTER;
@@ -376,18 +309,12 @@ function initManes() {
 }
 
 /* =========================
-   12) 갈기 한 가닥 클래스
+   갈기 클래스
 ========================= */
 class ManeStrand {
   constructor(x, y, dirX, dirY, index, total) {
-    this.baseX = x;
-    this.baseY = y;
-    this.dirX = dirX;
-    this.dirY = dirY;
-
     this.index = index;
     this.segments = MANE_SEGMENTS;
-
     this.segmentLength = (canvas.width * 0.5) / MANE_SEGMENTS;
 
     this.points = [];
@@ -396,11 +323,9 @@ class ManeStrand {
     this.touchStrength = 0;
     this.windPhase = Math.random() * Math.PI * 2;
     this.windSpeed = 0.04 + Math.random() * 0.02;
-
     this.bindings = [];
 
     const t = index / Math.max(total - 1, 1);
-
     const hue = 0;
     const saturation = 90 - t * 80;
     const lightness = 52 + t * 38;
@@ -410,8 +335,8 @@ class ManeStrand {
     this.rootColor = `hsl(${hue}, ${Math.max(saturation - 10, 5)}%, ${rootLightness}%)`;
 
     for (let i = 0; i <= this.segments; i++) {
-      const px = x + i * this.segmentLength * this.dirX;
-      const py = y + i * this.segmentLength * this.dirY;
+      const px = x + i * this.segmentLength * dirX;
+      const py = y + i * this.segmentLength * dirY;
 
       this.points.push({
         x: px,
@@ -422,10 +347,6 @@ class ManeStrand {
 
       this.velocities.push({ x: 0, y: 0 });
     }
-  }
-
-  hasAnyBinding() {
-    return this.bindings.length > 0;
   }
 
   getBindings() {
@@ -446,14 +367,9 @@ class ManeStrand {
   }
 
   bindToRibbon(ribbonId, segmentIndex) {
-    // 갈기 한 가닥은 리본 하나에만 묶일 수 있음
-    if (this.hasAnyBinding()) return false;
     if (this.isSegmentBound(segmentIndex)) return false;
 
-    this.bindings.push({
-      ribbonId,
-      segmentIndex,
-    });
+    this.bindings.push({ ribbonId, segmentIndex });
     return true;
   }
 
@@ -470,7 +386,7 @@ class ManeStrand {
     for (let i = 1; i < this.points.length; i++) {
       const dx = mouseX - this.points[i].x;
       const dy = mouseY - this.points[i].y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = Math.hypot(dx, dy);
 
       if (dist < POINTER_INFLUENCE_RADIUS && mouseDown) {
         this.touched = true;
@@ -508,15 +424,12 @@ class ManeStrand {
       }
 
       const bindingAtPoint = bindings.find((b) => b.segmentIndex === i);
-      const isBoundPoint = !!bindingAtPoint;
-      const returnStrength = isBoundPoint ? 0 : 0.035;
+      const returnStrength = bindingAtPoint ? 0 : 0.035;
 
-      const returnForceX =
+      this.velocities[i].x +=
         (this.points[i].baseX - this.points[i].x) * returnStrength;
-      const returnForceY =
+      this.velocities[i].y +=
         (this.points[i].baseY - this.points[i].y) * returnStrength;
-      this.velocities[i].x += returnForceX;
-      this.velocities[i].y += returnForceY;
 
       if (bindingAtPoint) {
         const targetRibbon = bindingAtPoint.ribbon;
@@ -541,8 +454,7 @@ class ManeStrand {
       this.points[0].x = this.points[0].baseX;
       this.points[0].y = this.points[0].baseY;
 
-      const bindingsNow = this.getBindings();
-      bindingsNow.forEach(({ ribbon, segmentIndex }) => {
+      this.getBindings().forEach(({ ribbon, segmentIndex }) => {
         this.points[segmentIndex].x = ribbon.x;
         this.points[segmentIndex].y = ribbon.y;
       });
@@ -550,7 +462,7 @@ class ManeStrand {
       for (let i = 1; i < this.points.length; i++) {
         const dx = this.points[i].x - this.points[i - 1].x;
         const dy = this.points[i].y - this.points[i - 1].y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+        const dist = Math.hypot(dx, dy) || 0.0001;
         const diff = this.segmentLength - dist;
         const percent = diff / dist;
 
@@ -575,7 +487,6 @@ class ManeStrand {
 
   draw() {
     ctx.save();
-
     ctx.beginPath();
     ctx.moveTo(this.points[0].x, this.points[0].y);
 
@@ -591,16 +502,15 @@ class ManeStrand {
     ctx.strokeStyle = this.color;
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 7;
     ctx.shadowColor = this.rootColor;
     ctx.stroke();
-
     ctx.restore();
   }
 }
 
 /* =========================
-   13) spine 텍스트 그리기
+   spine 텍스트
 ========================= */
 function getLetterFontSize() {
   return Math.max(24, canvas.width * LETTER_TEXT_SIZE_RATIO);
@@ -612,12 +522,10 @@ function getEngFontSize() {
 
 function setSpineTextStyle(type = "ko") {
   if (type === "eng") {
-    const fontSize = getEngFontSize();
-    ctx.font = `${LETTER_ENG_TEXT_WEIGHT} ${fontSize}px ${LETTER_ENG_FONT_FAMILY}`;
+    ctx.font = `${LETTER_ENG_TEXT_WEIGHT} ${getEngFontSize()}px ${LETTER_ENG_FONT_FAMILY}`;
     ctx.fillStyle = LETTER_ENG_TEXT_COLOR;
   } else {
-    const fontSize = getLetterFontSize();
-    ctx.font = `${LETTER_TEXT_WEIGHT} ${fontSize}px ${LETTER_TEXT_FONT_FAMILY}`;
+    ctx.font = `${LETTER_TEXT_WEIGHT} ${getLetterFontSize()}px ${LETTER_TEXT_FONT_FAMILY}`;
     ctx.fillStyle = LETTER_TEXT_COLOR;
   }
 
@@ -632,9 +540,9 @@ function measureTextSequence(text, type = "ko") {
   let total = 0;
 
   for (const char of text) {
-    const w = ctx.measureText(char).width;
-    widths.push(w);
-    total += w;
+    const width = ctx.measureText(char).width;
+    widths.push(width);
+    total += width;
   }
 
   return { widths, total };
@@ -647,25 +555,21 @@ function getPointOnSpine(distance) {
     const u = layout.arcLen > 0 ? distance / layout.arcLen : 0;
     const angle = layout.startAngle + u * (layout.endAngle - layout.startAngle);
 
-    const x = layout.cx + layout.R * Math.cos(angle);
-    const y = layout.cy + layout.R * Math.sin(angle);
-
-    const tangentAngle = angle + Math.PI / 2;
-    const normalX = Math.cos(angle);
-    const normalY = Math.sin(angle);
-
-    return { x, y, tangentAngle, normalX, normalY };
+    return {
+      x: layout.cx + layout.R * Math.cos(angle),
+      y: layout.cy + layout.R * Math.sin(angle),
+      tangentAngle: angle + Math.PI / 2,
+      normalX: Math.cos(angle),
+      normalY: Math.sin(angle),
+    };
   }
 
   const d = distance - layout.arcLen;
   const u = layout.vertLen > 0 ? d / layout.vertLen : 0;
 
-  const x = layout.endX;
-  const y = layout.endY + u * layout.vertLen;
-
   return {
-    x,
-    y,
+    x: layout.endX,
+    y: layout.endY + u * layout.vertLen,
     tangentAngle: Math.PI / 2,
     normalX: 1,
     normalY: 0,
@@ -674,7 +578,6 @@ function getPointOnSpine(distance) {
 
 function drawStackedTextSequenceOnSpine(koText, engText, startDistance) {
   const layout = getLayoutValues();
-
   const ko = koText || "";
   const eng = engText || "";
 
@@ -683,32 +586,26 @@ function drawStackedTextSequenceOnSpine(koText, engText, startDistance) {
   const koMeasure = measureTextSequence(ko, "ko");
   const engMeasure = measureTextSequence(eng, "eng");
 
-  const maxLength = Math.max(ko.length, eng.length);
-  const koWidths = koMeasure.widths;
-  const engWidths = engMeasure.widths;
-
   let cursor = startDistance;
+  const maxLength = Math.max(ko.length, eng.length);
 
   for (let i = 0; i < maxLength; i++) {
     const koChar = ko[i] || "";
     const engChar = eng[i] || "";
 
-    const koWidthRaw = koChar ? koWidths[i] || 0 : 0;
-    const engWidthRaw = engChar ? engWidths[i] || 0 : 0;
+    const koWidthRaw = koChar ? koMeasure.widths[i] || 0 : 0;
+    const engWidthRaw = engChar ? engMeasure.widths[i] || 0 : 0;
 
     const probeDistance = cursor + Math.max(koWidthRaw, engWidthRaw, 6) / 2;
     const isArc = probeDistance <= layout.arcLen;
 
-    const koSpacingScale = isArc
-      ? ARC_KO_TEXT_SPACING_SCALE
-      : VERTICAL_KO_TEXT_SPACING_SCALE;
+    const koWidth =
+      koWidthRaw *
+      (isArc ? ARC_KO_TEXT_SPACING_SCALE : VERTICAL_KO_TEXT_SPACING_SCALE);
 
-    const engSpacingScale = isArc
-      ? ARC_ENG_TEXT_SPACING_SCALE
-      : VERTICAL_ENG_TEXT_SPACING_SCALE;
-
-    const koWidth = koWidthRaw * koSpacingScale;
-    const engWidth = engWidthRaw * engSpacingScale;
+    const engWidth =
+      engWidthRaw *
+      (isArc ? ARC_ENG_TEXT_SPACING_SCALE : VERTICAL_ENG_TEXT_SPACING_SCALE);
 
     const stepWidth = Math.max(koWidth, engWidth, 6);
     const charCenter = cursor + stepWidth / 2;
@@ -718,28 +615,24 @@ function drawStackedTextSequenceOnSpine(koText, engText, startDistance) {
     const p = getPointOnSpine(charCenter);
 
     if (koChar) {
-      const koX =
-        p.x + p.normalX * (layout.thickManeLength * LETTER_KO_OFFSET_SCALE);
-      const koY =
-        p.y + p.normalY * (layout.thickManeLength * LETTER_KO_OFFSET_SCALE);
-
       setSpineTextStyle("ko");
       ctx.save();
-      ctx.translate(koX, koY);
+      ctx.translate(
+        p.x + p.normalX * (layout.thickManeLength * LETTER_KO_OFFSET_SCALE),
+        p.y + p.normalY * (layout.thickManeLength * LETTER_KO_OFFSET_SCALE),
+      );
       ctx.rotate(p.tangentAngle);
       ctx.fillText(koChar, 0, 0);
       ctx.restore();
     }
 
     if (engChar) {
-      const engX =
-        p.x + p.normalX * (layout.thickManeLength * LETTER_ENG_OFFSET_SCALE);
-      const engY =
-        p.y + p.normalY * (layout.thickManeLength * LETTER_ENG_OFFSET_SCALE);
-
       setSpineTextStyle("eng");
       ctx.save();
-      ctx.translate(engX, engY);
+      ctx.translate(
+        p.x + p.normalX * (layout.thickManeLength * LETTER_ENG_OFFSET_SCALE),
+        p.y + p.normalY * (layout.thickManeLength * LETTER_ENG_OFFSET_SCALE),
+      );
       ctx.rotate(p.tangentAngle);
       ctx.fillText(engChar, 0, 0);
       ctx.restore();
@@ -753,79 +646,43 @@ function drawStackedTextSequenceOnSpine(koText, engText, startDistance) {
 
 function drawSelectedLetterOnSpine() {
   if (!selectedLetterRow) return;
-
-  const letterText = selectedLetterRow.letter || "";
-  const engText = selectedLetterRow.eng || "";
-
-  drawStackedTextSequenceOnSpine(letterText, engText, LETTER_TEXT_START_OFFSET);
+  drawStackedTextSequenceOnSpine(
+    selectedLetterRow.letter || "",
+    selectedLetterRow.eng || "",
+    LETTER_TEXT_START_OFFSET,
+  );
 }
 
 function drawCornerText() {
-  ctx.save();
+  if (!CORNER_TEXT) return;
 
+  ctx.save();
   ctx.font = `${CORNER_TEXT_WEIGHT} ${CORNER_TEXT_SIZE}px ${CORNER_TEXT_FONT_FAMILY}`;
   ctx.fillStyle = CORNER_TEXT_COLOR;
   ctx.textAlign = "left";
   ctx.textBaseline = "bottom";
-
   ctx.fillText(
     CORNER_TEXT,
     CORNER_TEXT_LEFT,
     canvas.height - CORNER_TEXT_BOTTOM,
   );
-
   ctx.restore();
 }
 
 /* =========================
-   14) spine 라인
-========================= */
-function drawSpine() {
-  const layout = getLayoutValues();
-
-  ctx.save();
-  ctx.beginPath();
-
-  const startX = layout.cx + layout.R * Math.cos(layout.startAngle);
-  const startY = layout.cy + layout.R * Math.sin(layout.startAngle);
-
-  ctx.moveTo(startX, startY);
-  ctx.arc(
-    layout.cx,
-    layout.cy,
-    layout.R,
-    layout.startAngle,
-    layout.endAngle,
-    false,
-  );
-  ctx.lineTo(layout.endX, canvas.height);
-
-  ctx.strokeStyle = SPINE_COLOR;
-  ctx.lineWidth = Math.max(10, canvas.width * 0.035);
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.shadowBlur = 0;
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-/* =========================
-   15) 구슬 생성 / 제거 / 탐색
+   리본 생성 / 제거
 ========================= */
 function createRibbon(x, y) {
   const id = `${Date.now()}-${Math.random()}`;
-  const MAX_BIND_COUNT = 20;
   const candidateBindings = [];
 
   manes.forEach((mane) => {
-    // 이미 어떤 리본에라도 잡혀 있는 갈기는 제외
-    if (mane.hasAnyBinding()) return;
-
     let bestIndex = -1;
     let bestDist = Infinity;
 
     for (let i = 1; i < mane.points.length; i++) {
+      if (mane.isSegmentBound(i)) continue;
+
       const dx = x - mane.points[i].x;
       const dy = y - mane.points[i].y;
       const dist = Math.hypot(dx, dy);
@@ -848,7 +705,6 @@ function createRibbon(x, y) {
   if (candidateBindings.length === 0) return;
 
   candidateBindings.sort((a, b) => a.dist - b.dist);
-  const selectedBindings = candidateBindings.slice(0, MAX_BIND_COUNT);
 
   const ribbon = {
     id,
@@ -856,21 +712,21 @@ function createRibbon(x, y) {
     y,
     color: getRandomRibbonColor(),
   };
+
   ribbons.push(ribbon);
 
-  selectedBindings.forEach(({ mane, segmentIndex }) => {
-    mane.bindToRibbon(id, segmentIndex);
-  });
+  candidateBindings
+    .slice(0, MAX_BIND_COUNT)
+    .forEach(({ mane, segmentIndex }) => {
+      mane.bindToRibbon(id, segmentIndex);
+    });
 
   playRibbonSound();
 }
 
 function removeRibbon(ribbonId) {
   ribbons = ribbons.filter((r) => r.id !== ribbonId);
-
-  manes.forEach((mane) => {
-    mane.unbindRibbon(ribbonId);
-  });
+  manes.forEach((mane) => mane.unbindRibbon(ribbonId));
 }
 
 function findRibbonAtPoint(x, y) {
@@ -878,10 +734,7 @@ function findRibbonAtPoint(x, y) {
   let bestDist = Infinity;
 
   ribbons.forEach((ribbon) => {
-    const dx = x - ribbon.x;
-    const dy = y - ribbon.y;
-    const dist = Math.hypot(dx, dy);
-
+    const dist = Math.hypot(x - ribbon.x, y - ribbon.y);
     if (dist < RIBBON_TOGGLE_RADIUS && dist < bestDist) {
       bestDist = dist;
       hitRibbon = ribbon;
@@ -892,21 +745,19 @@ function findRibbonAtPoint(x, y) {
 }
 
 /* =========================
-   16) 구슬 렌더링
+   리본 렌더링
 ========================= */
 function drawRibbon(ribbon) {
   ctx.save();
   ctx.translate(ribbon.x, ribbon.y);
 
-  const radius = BEAD_RADIUS;
-
   const beadGradient = ctx.createRadialGradient(
-    -radius * 0.28,
-    -radius * 0.3,
-    radius * 0.08,
+    -BEAD_RADIUS * 0.28,
+    -BEAD_RADIUS * 0.3,
+    BEAD_RADIUS * 0.08,
     0,
     0,
-    radius,
+    BEAD_RADIUS,
   );
 
   beadGradient.addColorStop(0, ribbon.color.highlight);
@@ -915,7 +766,7 @@ function drawRibbon(ribbon) {
   beadGradient.addColorStop(1, ribbon.color.base);
 
   ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.arc(0, 0, BEAD_RADIUS, 0, Math.PI * 2);
   ctx.fillStyle = beadGradient;
   ctx.fill();
 
@@ -938,7 +789,7 @@ function handleBindTap(x, y) {
 }
 
 /* =========================
-   17) 포인터 입력 처리
+   포인터 입력 처리
 ========================= */
 function beginPointer(x, y) {
   mouseX = x;
@@ -959,11 +810,12 @@ function movePointer(x, y) {
   pointerCurrentX = x;
   pointerCurrentY = y;
 
-  const dx = pointerCurrentX - pointerStartX;
-  const dy = pointerCurrentY - pointerStartY;
-  const dist = Math.hypot(dx, dy);
-
-  if (dist > CLICK_MOVE_THRESHOLD) {
+  if (
+    Math.hypot(
+      pointerCurrentX - pointerStartX,
+      pointerCurrentY - pointerStartY,
+    ) > CLICK_MOVE_THRESHOLD
+  ) {
     pointerMoved = true;
   }
 }
@@ -975,9 +827,10 @@ function endPointer(x, y, isTouch = false) {
   pointerCurrentY = y;
 
   const duration = performance.now() - pointerDownTime;
-  const dx = pointerCurrentX - pointerStartX;
-  const dy = pointerCurrentY - pointerStartY;
-  const dist = Math.hypot(dx, dy);
+  const dist = Math.hypot(
+    pointerCurrentX - pointerStartX,
+    pointerCurrentY - pointerStartY,
+  );
 
   const moveThreshold = isTouch
     ? TOUCH_TAP_MOVE_THRESHOLD
@@ -997,7 +850,7 @@ function endPointer(x, y, isTouch = false) {
 }
 
 /* =========================
-   18) 이벤트 등록
+   이벤트 등록
 ========================= */
 canvas.addEventListener("mousemove", (e) => {
   const rect = canvas.getBoundingClientRect();
@@ -1014,16 +867,12 @@ canvas.addEventListener("mousemove", (e) => {
 
 canvas.addEventListener("mousedown", (e) => {
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  beginPointer(x, y);
+  beginPointer(e.clientX - rect.left, e.clientY - rect.top);
 });
 
 canvas.addEventListener("mouseup", (e) => {
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  endPointer(x, y);
+  endPointer(e.clientX - rect.left, e.clientY - rect.top);
 });
 
 canvas.addEventListener("mouseleave", () => {
@@ -1035,9 +884,7 @@ canvas.addEventListener(
   (e) => {
     const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
-    beginPointer(x, y);
+    beginPointer(touch.clientX - rect.left, touch.clientY - rect.top);
   },
   { passive: true },
 );
@@ -1048,9 +895,7 @@ canvas.addEventListener(
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
-    movePointer(x, y);
+    movePointer(touch.clientX - rect.left, touch.clientY - rect.top);
   },
   { passive: false },
 );
@@ -1060,7 +905,7 @@ canvas.addEventListener("touchend", () => {
 });
 
 /* =========================
-   19) 렌더 루프
+   렌더 루프
 ========================= */
 function animate() {
   ctx.fillStyle = BG_COLOR;
@@ -1074,14 +919,12 @@ function animate() {
     mane.draw();
   });
 
-  // drawSpine();
   drawRibbons();
-
   requestAnimationFrame(animate);
 }
 
 /* =========================
-   20) 시작
+   시작
 ========================= */
 async function init() {
   resizeCanvas();
