@@ -20,7 +20,7 @@ const MANE_ROOT_JITTER = 3;
 ========================= */
 const CORNER_TEXT = "";
 const CORNER_TEXT_COLOR = "rgba(255, 168, 168, 0.9)";
-const CORNER_TEXT_FONT_FAMILY = '"Times New Roman", serif';
+const CORNER_TEXT_FONT_FAMILY = '"MyEnglishFont", serif';
 const CORNER_TEXT_WEIGHT = "400";
 const CORNER_TEXT_SIZE = 18;
 const CORNER_TEXT_LEFT = 24;
@@ -29,16 +29,20 @@ const CORNER_TEXT_BOTTOM = 24;
 const LETTER_TEXT_COLOR = "rgba(255, 168, 168, 0.95)";
 const LETTER_ENG_TEXT_COLOR = "rgba(255, 168, 168, 0.72)";
 const LETTER_TEXT_FONT_FAMILY = '"MyLocalFont", serif';
-const LETTER_ENG_FONT_FAMILY = '"Times New Roman", serif';
+const LETTER_ENG_FONT_FAMILY = '"MyEnglishFont", serif';
 
 const LETTER_TEXT_WEIGHT = "150";
 const LETTER_ENG_TEXT_WEIGHT = "400";
 
-const LETTER_TEXT_SIZE_RATIO = 0.01;
-const LETTER_ENG_TEXT_SIZE_RATIO = 0.0065;
+/* 여기 키우면 됨 */
+const LETTER_TEXT_SIZE_RATIO = 0.013;
+const LETTER_ENG_TEXT_SIZE_RATIO = 0.008;
 
 const LETTER_TEXT_START_OFFSET = 40;
-const LETTER_ENG_GAP = 48;
+
+// spine 기준 위아래 두 줄 거리
+const LETTER_KO_OFFSET_SCALE = 0.68;
+const LETTER_ENG_OFFSET_SCALE = 0.42;
 
 /* =========================
    3) 구글 시트 CSV 주소
@@ -587,11 +591,11 @@ class ManeStrand {
    13) spine 텍스트 그리기
 ========================= */
 function getLetterFontSize() {
-  return Math.max(18, canvas.width * LETTER_TEXT_SIZE_RATIO);
+  return Math.max(24, canvas.width * LETTER_TEXT_SIZE_RATIO);
 }
 
 function getEngFontSize() {
-  return Math.max(13, canvas.width * LETTER_ENG_TEXT_SIZE_RATIO);
+  return Math.max(18, canvas.width * LETTER_ENG_TEXT_SIZE_RATIO);
 }
 
 function setSpineTextStyle(type = "ko") {
@@ -656,41 +660,66 @@ function getPointOnSpine(distance) {
   };
 }
 
-function drawTextSequenceOnSpine(
-  text,
-  startDistance,
-  type = "ko",
-  offsetScale = 0.5,
-) {
-  if (!text) return startDistance;
-
+function drawStackedTextSequenceOnSpine(koText, engText, startDistance) {
   const layout = getLayoutValues();
-  setSpineTextStyle(type);
 
-  const { widths, total } = measureTextSequence(text, type);
-  if (total <= 0) return startDistance;
+  const ko = koText || "";
+  const eng = engText || "";
 
-  const textOffset = layout.thickManeLength * offsetScale;
+  if (!ko && !eng) return startDistance;
+
+  const koMeasure = measureTextSequence(ko, "ko");
+  const engMeasure = measureTextSequence(eng, "eng");
+
+  const maxLength = Math.max(ko.length, eng.length);
+  const koWidths = koMeasure.widths;
+  const engWidths = engMeasure.widths;
+
   let cursor = startDistance;
 
-  for (let i = 0; i < text.length; i++) {
-    const charWidth = widths[i];
-    const charCenter = cursor + charWidth / 2;
+  for (let i = 0; i < maxLength; i++) {
+    const koChar = ko[i] || "";
+    const engChar = eng[i] || "";
+
+    const koWidth = koChar ? koWidths[i] || 0 : 0;
+    const engWidth = engChar ? engWidths[i] || 0 : 0;
+
+    const stepWidth = Math.max(koWidth, engWidth, 6);
+    const charCenter = cursor + stepWidth / 2;
 
     if (charCenter >= layout.totalLen) break;
 
     const p = getPointOnSpine(charCenter);
 
-    const drawX = p.x + p.normalX * textOffset;
-    const drawY = p.y + p.normalY * textOffset;
+    if (koChar) {
+      const koX =
+        p.x + p.normalX * (layout.thickManeLength * LETTER_KO_OFFSET_SCALE);
+      const koY =
+        p.y + p.normalY * (layout.thickManeLength * LETTER_KO_OFFSET_SCALE);
 
-    ctx.save();
-    ctx.translate(drawX, drawY);
-    ctx.rotate(p.tangentAngle);
-    ctx.fillText(text[i], 0, 0);
-    ctx.restore();
+      setSpineTextStyle("ko");
+      ctx.save();
+      ctx.translate(koX, koY);
+      ctx.rotate(p.tangentAngle);
+      ctx.fillText(koChar, 0, 0);
+      ctx.restore();
+    }
 
-    cursor += charWidth;
+    if (engChar) {
+      const engX =
+        p.x + p.normalX * (layout.thickManeLength * LETTER_ENG_OFFSET_SCALE);
+      const engY =
+        p.y + p.normalY * (layout.thickManeLength * LETTER_ENG_OFFSET_SCALE);
+
+      setSpineTextStyle("eng");
+      ctx.save();
+      ctx.translate(engX, engY);
+      ctx.rotate(p.tangentAngle);
+      ctx.fillText(engChar, 0, 0);
+      ctx.restore();
+    }
+
+    cursor += stepWidth;
   }
 
   return cursor;
@@ -702,14 +731,7 @@ function drawSelectedLetterOnSpine() {
   const letterText = selectedLetterRow.letter || "";
   const engText = selectedLetterRow.eng || "";
 
-  let cursor = LETTER_TEXT_START_OFFSET;
-
-  cursor = drawTextSequenceOnSpine(letterText, cursor, "ko", 0.5);
-
-  if (engText) {
-    cursor += LETTER_ENG_GAP;
-    drawTextSequenceOnSpine(engText, cursor, "eng", 0.72);
-  }
+  drawStackedTextSequenceOnSpine(letterText, engText, LETTER_TEXT_START_OFFSET);
 }
 
 function drawCornerText() {
@@ -1039,6 +1061,7 @@ async function init() {
   window.addEventListener("resize", resizeCanvas);
 
   await document.fonts.load('16px "MyLocalFont"');
+  await document.fonts.load('16px "MyEnglishFont"');
   await document.fonts.ready;
 
   ctx.fillStyle = BG_COLOR;
