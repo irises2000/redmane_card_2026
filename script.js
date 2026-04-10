@@ -66,6 +66,10 @@ const MAX_BIND_COUNT = 10;
 const ribbonSound = new Audio("./horse.mp3");
 ribbonSound.preload = "auto";
 
+const HOLD_SOUND_DELAY = 2000;
+let holdSoundTimer = null;
+let holdSoundPlayed = false;
+
 function playRibbonSound() {
   try {
     ribbonSound.currentTime = 0;
@@ -74,6 +78,25 @@ function playRibbonSound() {
     });
   } catch (err) {
     console.warn("Sound error:", err);
+  }
+}
+
+function startHoldSoundTimer() {
+  clearHoldSoundTimer();
+  holdSoundPlayed = false;
+
+  holdSoundTimer = setTimeout(() => {
+    if (mouseDown && !holdSoundPlayed) {
+      playRibbonSound();
+      holdSoundPlayed = true;
+    }
+  }, HOLD_SOUND_DELAY);
+}
+
+function clearHoldSoundTimer() {
+  if (holdSoundTimer) {
+    clearTimeout(holdSoundTimer);
+    holdSoundTimer = null;
   }
 }
 
@@ -720,8 +743,6 @@ function createRibbon(x, y) {
     .forEach(({ mane, segmentIndex }) => {
       mane.bindToRibbon(id, segmentIndex);
     });
-
-  playRibbonSound();
 }
 
 function removeRibbon(ribbonId) {
@@ -802,6 +823,8 @@ function beginPointer(x, y) {
   pointerCurrentY = y;
   pointerDownTime = performance.now();
   pointerMoved = false;
+
+  startHoldSoundTimer();
 }
 
 function movePointer(x, y) {
@@ -847,15 +870,35 @@ function endPointer(x, y, isTouch = false) {
   }
 
   mouseDown = false;
+  clearHoldSoundTimer();
+}
+
+function cancelPointer() {
+  mouseDown = false;
+  clearHoldSoundTimer();
+}
+
+function getCanvasPointFromMouseEvent(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top,
+  };
+}
+
+function getCanvasPointFromTouch(touch) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: touch.clientX - rect.left,
+    y: touch.clientY - rect.top,
+  };
 }
 
 /* =========================
    이벤트 등록
 ========================= */
 canvas.addEventListener("mousemove", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+  const { x, y } = getCanvasPointFromMouseEvent(e);
 
   if (mouseDown) {
     movePointer(x, y);
@@ -866,25 +909,26 @@ canvas.addEventListener("mousemove", (e) => {
 });
 
 canvas.addEventListener("mousedown", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  beginPointer(e.clientX - rect.left, e.clientY - rect.top);
+  const { x, y } = getCanvasPointFromMouseEvent(e);
+  beginPointer(x, y);
 });
 
 canvas.addEventListener("mouseup", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  endPointer(e.clientX - rect.left, e.clientY - rect.top);
+  const { x, y } = getCanvasPointFromMouseEvent(e);
+  endPointer(x, y);
 });
 
 canvas.addEventListener("mouseleave", () => {
-  mouseDown = false;
+  cancelPointer();
 });
 
 canvas.addEventListener(
   "touchstart",
   (e) => {
-    const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
-    beginPointer(touch.clientX - rect.left, touch.clientY - rect.top);
+    if (!touch) return;
+    const { x, y } = getCanvasPointFromTouch(touch);
+    beginPointer(x, y);
   },
   { passive: true },
 );
@@ -893,15 +937,20 @@ canvas.addEventListener(
   "touchmove",
   (e) => {
     e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
-    movePointer(touch.clientX - rect.left, touch.clientY - rect.top);
+    if (!touch) return;
+    const { x, y } = getCanvasPointFromTouch(touch);
+    movePointer(x, y);
   },
   { passive: false },
 );
 
 canvas.addEventListener("touchend", () => {
   endPointer(pointerCurrentX, pointerCurrentY, true);
+});
+
+canvas.addEventListener("touchcancel", () => {
+  cancelPointer();
 });
 
 /* =========================
