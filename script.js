@@ -401,13 +401,13 @@ class ManeStrand {
 
     const t = index / Math.max(total - 1, 1);
 
-    // const hue = 0;
-    // const saturation = 90 - t * 80;
-    // const lightness = 52 + t * 38;
-    // const rootLightness = 70 + t * 24;
+    const hue = 0;
+    const saturation = 90 - t * 80;
+    const lightness = 52 + t * 38;
+    const rootLightness = 70 + t * 24;
 
-    // this.color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-    // this.rootColor = `hsl(${hue}, ${Math.max(saturation - 10, 5)}%, ${rootLightness}%)`;
+    this.color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    this.rootColor = `hsl(${hue}, ${Math.max(saturation - 10, 5)}%, ${rootLightness}%)`;
 
     for (let i = 0; i <= this.segments; i++) {
       const px = x + i * this.segmentLength * this.dirX;
